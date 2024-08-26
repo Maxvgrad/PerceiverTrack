@@ -20,6 +20,7 @@
     3. `conda install conda-forge::seaborn=0.10.1`
     3. `conda install conda-forge::opencv`
     3. `pip install perceiver-pytorch`
+    3. `conda install conda-forge::wandb`
 
     5. Install MultiScaleDeformableAttention
        package: `python src/trackformer/models/ops/setup.py build --build-base=src/trackformer/models/ops/ install`

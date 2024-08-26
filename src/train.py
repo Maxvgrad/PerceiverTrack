@@ -1,5 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import datetime
+import json
 import os
 import random
 import time
@@ -9,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import sacred
 import torch
+import wandb
 import yaml
 from torch.utils.data import DataLoader, DistributedSampler
 
@@ -34,6 +36,7 @@ ex.add_named_config('coco_person_masks', 'cfgs/train_coco_person_masks.yaml')
 ex.add_named_config('full_res', 'cfgs/train_full_res.yaml')
 ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml')
 ex.add_named_config('perceiver', 'cfgs/train_perceiver.yaml')
+ex.add_named_config('tune_sequence_frames', 'cfgs/train_tune_sequence_frames.yaml')
 
 def train(args: Namespace) -> None:
     print(args)
@@ -277,7 +280,7 @@ def train(args: Namespace) -> None:
         # TRAIN
         if args.distributed:
             sampler_train.set_epoch(epoch)
-        train_one_epoch(
+        train_stats = train_one_epoch(
             model, criterion, postprocessors, data_loader_train, optimizer, device, epoch,
             visualizers['train'], args)
 
@@ -292,6 +295,8 @@ def train(args: Namespace) -> None:
         lr_scheduler.step()
 
         checkpoint_paths = [output_dir / 'checkpoint.pth']
+
+        val_stats = {}
 
         # VAL
         if epoch == 1 or not epoch % args.val_interval:
@@ -320,10 +325,20 @@ def train(args: Namespace) -> None:
                 if b_s == s:
                     checkpoint_paths.append(output_dir / f"checkpoint_best_{n}.pth")
 
+        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+                     **{f'test_{k}': v for k, v in val_stats.items()},
+                     'epoch': epoch,
+                     'n_parameters': n_parameters}
+
+        wandb.log(log_stats)
+
         # MODEL SAVING
         if args.output_dir:
             if args.save_model_interval and not epoch % args.save_model_interval:
                 checkpoint_paths.append(output_dir / f"checkpoint_epoch_{epoch}.pth")
+
+            with (output_dir / "log.txt").open("a") as f:
+                f.write(json.dumps(log_stats) + "\n")
 
             for checkpoint_path in checkpoint_paths:
                 utils.save_on_master({
@@ -347,9 +362,43 @@ def load_config(_config, _run):
     sacred.commands.print_config(_run)
 
 
+def run_sweep(args):
+    sweep_configuration = {
+        'method': 'grid',
+        'name': 'sequence_frames',
+        'metric': {
+            'name': 'test_loss',
+            'goal': 'minimize'
+        },
+        'parameters': {
+            'sequence_frames': {'values': [8, 16, 32, 64, 128]}
+        },
+        'early_terminate': {
+            'type': 'hyperband',
+            'max_iter': 12,
+            's': 3,
+            'eta': 3,
+            'strict': False,
+        }
+    }
+
+    def train_sweep():
+        with wandb.init(project='perceiver_track'): #  TODO: create argument
+            # TODO: make dynamic
+            args.sequence_frames = wandb.config.sequence_frames
+            train(args)
+
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="perceiver_track_sweep")
+    wandb.agent(sweep_id, function=train_sweep)
+
+
 if __name__ == '__main__':
     # TODO: hierachical Namespacing for nested dict
     config = ex.run_commandline().config
     args = nested_dict_to_namespace(config)
-    # args.train = Namespace(**config['train'])
-    train(args)
+
+    if args.task == 'tune':
+        wandb.init(project='perceiver_track')
+        run_sweep(args)
+    else:
+        train(args)
