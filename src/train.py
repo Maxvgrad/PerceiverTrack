@@ -381,7 +381,7 @@ def run_sweep(args):
             'goal': 'minimize'
         },
         'parameters': {
-            'sequence_frames': {'values': [32, 64]}
+            'sequence_frames': {'values': [8, 16, 32, 64]}
         },
         'early_terminate': {
             'type': 'hyperband',
