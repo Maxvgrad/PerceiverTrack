@@ -182,16 +182,18 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         img, target = self._getitem_from_id(idx, random_state, random_jitter=False)
 
         if self._prev_frame:
-            # PREV
+            imgs = [img]
+            targets = [target]
             prev_img, prev_target = self._getitem_from_id(idx, random_state)
-            target[f'prev_image'] = prev_img
-            target[f'prev_target'] = prev_target
 
+            imgs.append(prev_img)
+            targets.append(prev_target)
             if self._prev_prev_frame:
-                # PREV PREV
                 prev_prev_img, prev_prev_target = self._getitem_from_id(idx, random_state)
-                target[f'prev_prev_image'] = prev_prev_img
-                target[f'prev_prev_target'] = prev_prev_target
+                imgs.append(prev_prev_img)
+                targets.append(prev_prev_target)
+
+            return imgs, targets
 
         return img, target
 

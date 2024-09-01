@@ -1,6 +1,16 @@
-dataset: mot_crowdhuman
-crowdhuman_train_split: train_val
-train_split: null
-val_split: mot17_train_cross_val_frame_0_5_to_1_0_coco
-epochs: 80
-lr_drop: 50
+dataset: crowdhuman
+
+train_split: train
+val_split: val
+
+frame_dropout_prob: 0.0
+sequence_frames: null # We pick same img buy apply a different transformation
+tracking: true # we want to get a previous augmented frame
+tracking_eval: false # we do need tracking to fetch previous frame but not evaluation
+
+# Training
+epochs: 90
+lr_drop: 60
+
+# Evaluation
+max_num_of_frames_lookback: 1

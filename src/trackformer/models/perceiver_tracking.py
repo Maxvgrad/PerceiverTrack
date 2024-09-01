@@ -38,6 +38,9 @@ class PerceiverTracking(PerceiverDetection):
                 frame_keep_mask = torch.tensor(frame_keep_mask, device=batch.device)
                 frame_keep_mask = frame_keep_mask.view(-1, 1, 1, 1)
                 batch = batch * frame_keep_mask
+            else:
+                for current_target in current_targets:
+                    current_target['consecutive_frame_skip_number'] = torch.tensor(0, device=batch.device)
 
             out, *_ = super().forward(
                 samples=batch, targets=current_targets, latents=latents

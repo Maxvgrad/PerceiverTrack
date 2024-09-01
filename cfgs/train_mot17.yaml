@@ -8,5 +8,11 @@ mot_path_val: data/MOT17
 
 resume: models/output_perceiver_2024-08-05_23-20-10/checkpoint0149.pth
 
+sequence_frames: 16
+
+# Training
 epochs: 50
 lr_drop: 10
+
+# Evaluation
+max_num_of_frames_lookback: 4
