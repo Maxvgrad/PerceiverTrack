@@ -1,14 +1,16 @@
 dataset: crowdhuman
-crowdhuman_train_split: train_val
+
 train_split: train
 val_split: val
 
 frame_dropout_prob: 0.0
 sequence_frames: null # We pick same img buy apply a different transformation
+tracking: true # we want to get a previous augmented frame
+tracking_eval: false # we do need tracking to fetch previous frame but not evaluation
 
 # Training
-epochs: 80
-lr_drop: 50
+epochs: 90
+lr_drop: 60
 
 # Evaluation
-max_num_of_frames_lookback: 0
+max_num_of_frames_lookback: 1

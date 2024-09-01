@@ -144,7 +144,7 @@ num_workers: 2
 val_interval: 5
 debug: false
 # epoch interval for model saving. if 0 only save last and best models
-save_model_interval: 5
+save_model_interval: 10
 # distributed training parameters
 # number of distributed processes
 world_size: 1
