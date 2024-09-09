@@ -21,6 +21,7 @@
     3. `conda install conda-forge::opencv`
     3. `pip install perceiver-pytorch`
     3. `conda install conda-forge::wandb`
+    3. `pip install nuscenes-devkit` # nuimages dataset 
 
     5. Install MultiScaleDeformableAttention
        package: `python src/trackformer/models/ops/setup.py build --build-base=src/trackformer/models/ops/ install`
@@ -72,6 +73,18 @@
                 |   |   |-- annotation_val.odgt
                 |   |   |-- train_val.json
             ~~~
+           
+    4. [nuimages](https://www.nuscenes.org/nuimages):
+       1. Download dataset extract it in `./data/nuimages`
+       2. Run (optinally you can specify which cameras use images)
+
+        ```
+       python src/generate_coco_from_nuimages.py \
+         --data-root ./data/nuimages \
+         --version v1.0-train v1.0-val \
+         --out-dir ./data/nuimages/annotations/ \
+         --cameras CAM_FRONT
+       ```
 
 3. Download and unpack pretrained TrackFormer model files in the `models` directory:
 
