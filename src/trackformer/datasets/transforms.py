@@ -28,8 +28,6 @@ def crop(image, target, region, overflow_boxes=False):
 
     fields = ["labels", "area", "iscrowd", "ignore", "track_ids"]
 
-    orig_area = target["area"]
-
     if "boxes" in target:
         boxes = target["boxes"]
         max_size = torch.as_tensor([w, h], dtype=torch.float32)
