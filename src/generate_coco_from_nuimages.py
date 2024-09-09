@@ -187,6 +187,8 @@ def export_nuim_to_coco(nuim, data_root, out_dir, extra_tag, version, nproc, cam
 
 def main():
     args = parse_args()
+    print(args)
     for version in args.version:
+        print(f'Converting {version} dataset to COCO format...')
         nuim = NuImages(dataroot=args.data_root, version=version, verbose=True, lazy=True)
         export_nuim_to_coco(nuim, args.data_root, args.out_dir, args.extra_tag, version, args.nproc, args.cameras)
