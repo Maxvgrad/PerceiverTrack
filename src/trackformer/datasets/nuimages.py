@@ -65,13 +65,13 @@ class NuImagesDetection(torchvision.datasets.CocoDetection):
             past_img_target = {'keep_frame': torch.tensor([1], dtype=torch.int64)}
 
             if self._transforms is not None:
-                past_img, _ = self._transforms(past_img)  # No targets for past frames
+                past_img, past_img_target = self._transforms(past_img, past_img_target)  # No targets for past frames
 
             if random_state is not None:
                 random.setstate(curr_random_state['random'])
                 torch.random.set_rng_state(curr_random_state['torch'])
 
-            past_img, _ = self._norm_transforms(past_img)
+            past_img, past_img_target = self._norm_transforms(past_img, past_img_target)
 
             imgs.append(past_img)
             targets.append(past_img_target)
