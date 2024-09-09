@@ -75,6 +75,8 @@ class NuImagesDetection(torchvision.datasets.CocoDetection):
 
         img, target = self._norm_transforms(img, target)
 
+        target['keep_frame'] = torch.tensor([1], dtype=torch.int64)
+
         imgs.append(img)
         targets.append(target)
 
