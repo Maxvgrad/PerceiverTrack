@@ -53,12 +53,6 @@ class NuImagesDetection(torchvision.datasets.CocoDetection):
         target = {'image_id': img_id, 'annotations': target}
         img, target = self.prepare(img, target)
 
-        if self._debug:
-            img_dict = self.coco.imgs[img_id]
-            target['file_name'] = img_dict['file_name']
-            target['token'] = img_dict['token']
-            target['sample_token'] = img_dict['sample_token']
-
         for past_img_info in self.img_to_past[img_id]:
             past_img_path = os.path.join(self.root, past_img_info['file_name'])
             past_img = Image.open(past_img_path).convert("RGB")
