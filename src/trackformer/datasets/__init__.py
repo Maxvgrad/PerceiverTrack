@@ -3,6 +3,7 @@
 Submodule interface.
 """
 from argparse import Namespace
+
 from pycocotools.coco import COCO
 from torch.utils.data import Dataset, Subset
 from torchvision.datasets import CocoDetection
@@ -44,6 +45,9 @@ def build_dataset(split: str, args: Namespace) -> Dataset:
         # to avoid making panopticapi required for coco
         from .coco_panoptic import build as build_coco_panoptic
         dataset = build_coco_panoptic(split, args)
+    elif args.dataset == 'nuimages':
+        from .nuimages import build as build_nuimages
+        dataset = build_nuimages(split, args)
     else:
         raise ValueError(f'dataset {args.dataset} not supported')
 
