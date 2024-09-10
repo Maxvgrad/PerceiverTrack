@@ -43,14 +43,16 @@ class PerceiverTracking(PerceiverDetection):
                     current_target['consecutive_frame_skip_number'] = torch.tensor(0, device=batch.device)
 
             out, *_ = super().forward(
-                samples=batch, targets=current_targets, latents=latents
+                samples=batch, latents=latents
             )
             latents = out['hs_embed']
             latent_deque.appendleft(latents)
 
-            result['pred_logits'].append(out['pred_logits'])
-            result['pred_boxes'].append(out['pred_boxes'])
-            targets_flat.extend(current_targets)
+            if 'boxes' in current_targets[0]:
+                # frame has annotations then include it in output
+                result['pred_logits'].append(out['pred_logits'])
+                result['pred_boxes'].append(out['pred_boxes'])
+                targets_flat.extend(current_targets)
 
             for num_frames_lookback in range(1, 1 + max_num_of_frames_lookback):
                 if num_frames_lookback == len(latent_deque):

@@ -20,7 +20,7 @@ class PerceiverDetection(nn.Module):
         self.hidden_dim = perceiver.latents.shape[1]
         self.overflow_boxes = False
 
-    def forward(self, samples: NestedTensor, targets: list = None, latents: Tensor =None):
+    def forward(self, samples: NestedTensor, targets: list = None, latents: Tensor = None):
         if not isinstance(samples, NestedTensor):
             samples = nested_tensor_from_tensor_list(samples)
 

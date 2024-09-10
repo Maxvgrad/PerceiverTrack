@@ -110,6 +110,7 @@ dataset: coco
 train_split: train
 val_split: val
 coco_path: data/coco_2017
+nuimages_path: data/nuimages
 coco_panoptic_path: null
 mot_path_train: data/MOT17
 mot_path_val: data/MOT17

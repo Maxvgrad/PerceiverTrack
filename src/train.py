@@ -37,7 +37,7 @@ ex.add_named_config('full_res', 'cfgs/train_full_res.yaml')
 ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml')
 ex.add_named_config('perceiver', 'cfgs/train_perceiver.yaml')
 ex.add_named_config('tune_sequence_frames', 'cfgs/train_tune_sequence_frames.yaml')
-
+ex.add_named_config('nuimages', 'cfgs/train_nuimages.yaml')
 
 def train(args: Namespace) -> None:
     print(args)
