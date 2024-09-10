@@ -9,11 +9,9 @@ import torch.nn.functional as F
 import torchvision
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
-from torchvision.ops.feature_pyramid_network import (FeaturePyramidNetwork,
-                                                     LastLevelMaxPool)
 
-from ..util.misc import NestedTensor, is_main_process
 from .position_encoding import build_position_encoding
+from ..util.misc import NestedTensor, is_main_process
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -135,7 +133,7 @@ class IntermediateLayerGetterBackbone(nn.Module):
 
 
 def build_backbone(args):
-    if args.model == 'detr':
+    if not hasattr(args, 'model') or args.model == 'detr':
         position_embedding = build_position_encoding(args)
         train_backbone = args.lr_backbone > 0
         return_interm_layers = args.masks or (args.num_feature_levels > 1)

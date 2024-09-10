@@ -32,7 +32,7 @@ def build_model(args):
         # which we found to be less if we increase the number of classes. The number 20 is a bit arbitrary here.
         # https://github.com/timmeinhardt/trackformer/issues/50#issuecomment-1173942985
         num_classes = 20
-        if args.model == 'perceiver':
+        if hasattr(args, 'model') and args.model == 'perceiver':
             # Not clear why TrackFormer reduces number of classes to 20
             # Revert it to number of classes in COCO dataset
             # Perceiver was trained on COCO
@@ -49,7 +49,7 @@ def build_model(args):
     device = torch.device(args.device)
     matcher = build_matcher(args)
 
-    if args.model == 'perceiver':
+    if hasattr(args, 'model') and args.model == 'perceiver':
         model = build_model_perceiver_based(args, matcher, num_classes)
     else:
         model = build_model_detr_based(args, matcher, num_classes)
