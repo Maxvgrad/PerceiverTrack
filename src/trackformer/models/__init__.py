@@ -5,6 +5,7 @@ import torch
 
 from .backbone import build_backbone
 from .deformable_detr import DeformableDETR, DeformablePostProcess
+from .deformable_transformer import build_deforamble_transformer
 from .detr import DETR, PostProcess, SetCriterion
 from .detr_segmentation import (DeformableDETRSegm, DeformableDETRSegmTracking,
                                 DETRSegm, DETRSegmTracking,
@@ -142,7 +143,26 @@ def build_model_detr_based(args, matcher, num_classes):
     mask_kwargs = {
         'freeze_detr': args.freeze_detr}
     if args.deformable:
-        raise NotImplementedError('Deformable transformer is not supported.')
+        transformer = build_deforamble_transformer(args)
+
+        detr_kwargs['transformer'] = transformer
+        detr_kwargs['num_feature_levels'] = args.num_feature_levels
+        detr_kwargs['with_box_refine'] = args.with_box_refine
+        detr_kwargs['two_stage'] = args.two_stage
+        detr_kwargs['multi_frame_attention'] = args.multi_frame_attention
+        detr_kwargs['multi_frame_encoding'] = args.multi_frame_encoding
+        detr_kwargs['merge_frame_features'] = args.merge_frame_features
+
+        if args.tracking:
+            if args.masks:
+                model = DeformableDETRSegmTracking(mask_kwargs, tracking_kwargs, detr_kwargs)
+            else:
+                model = DeformableDETRTracking(tracking_kwargs, detr_kwargs)
+        else:
+            if args.masks:
+                model = DeformableDETRSegm(mask_kwargs, detr_kwargs)
+            else:
+                model = DeformableDETR(**detr_kwargs)
     else:
         transformer = build_transformer(args)
 
