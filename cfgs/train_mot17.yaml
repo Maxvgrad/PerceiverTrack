@@ -6,9 +6,7 @@ val_split: mot17_train_cross_val_frame_0_5_to_1_0_coco
 mot_path_train: data/MOT17
 mot_path_val: data/MOT17
 
-resume: models/output_perceiver_2024-08-05_23-20-10/checkpoint0149.pth
-
-sequence_frames: 16
+sequence_frames: 17
 
 # Training
 epochs: 50
