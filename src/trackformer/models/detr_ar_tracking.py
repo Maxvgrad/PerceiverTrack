@@ -13,7 +13,7 @@ class DETRArTrackingBase(nn.Module):
     def __init__(self,
                  obj_detector_post,
                  track_obj_score_threshold: float = 0.4,
-                 max_num_of_frames_lookback: int = 4,
+                 max_num_of_frames_lookback: int = 0,
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
@@ -71,7 +71,7 @@ class DETRArTrackingBase(nn.Module):
                 track_scores = post_process_result['scores']
 
                 track_keep = torch.logical_and(
-                    track_scores > self.track_obj_score_thresh,
+                    track_scores > self._track_obj_score_threshold,
                     post_process_result['labels'][:] == 0
                 )
 
