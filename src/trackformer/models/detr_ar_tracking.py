@@ -13,6 +13,7 @@ class DETRArTrackingBase(nn.Module):
     def __init__(self,
                  obj_detector_post,
                  track_obj_score_threshold: float = 0.4,
+                 **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
         self._track_obj_score_threshold = track_obj_score_threshold
