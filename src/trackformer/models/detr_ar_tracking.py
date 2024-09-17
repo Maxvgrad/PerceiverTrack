@@ -36,7 +36,7 @@ class DETRArTrackingBase(nn.Module):
         # indecision from 1 to max_num_of_frames_lookback reserved for latents which was produced by dripping frame
         # index is equal to how many times frame was dropped in a row
         # e.g. if index is 3 then latent from timestamp-3 was fed into the model 3 times without frame input
-        latent_deque = deque(maxlen=max_num_of_frames_lookback + 1)
+        output_deque = deque(maxlen=max_num_of_frames_lookback + 1)
         targets_flat = []
         hs_embeds = []
         orig_size = torch.stack([t[-1]["orig_size"] for t in targets], dim=0).to(src.device)
@@ -53,33 +53,15 @@ class DETRArTrackingBase(nn.Module):
                 for current_target in current_targets:
                     current_target['consecutive_frame_skip_number'] = torch.tensor(0, device=batch.device)
 
-            if len(hs_embeds) > 0:
-                for i, current_target in enumerate(current_targets):
-                    current_target['track_query_hs_embeds'] = hs_embeds[i][0]
-                    current_target['track_query_boxes'] = hs_embeds[i][1]
+            current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds)
 
             out, targets_resp, features, memory, hs = super().forward(
                 samples=batch, targets=current_targets
             )
 
-            post_process_results = self._obj_detector_post['bbox'](out, orig_size)
+            hs_embeds = self.filter_hs_embeds(orig_size, out)
 
-            hs_embeds = []
-
-            for i, post_process_result in enumerate(post_process_results):
-
-                track_scores = post_process_result['scores']
-
-                track_keep = torch.logical_and(
-                    track_scores > self._track_obj_score_threshold,
-                    post_process_result['labels'][:] == 0
-                )
-
-                hs_embeds.append(
-                    (out['hs_embed'][i][track_keep], post_process_result['boxes'][track_keep])
-                )
-
-            latent_deque.appendleft(out['hs_embed'])
+            output_deque.appendleft(out)
 
             if 'boxes' in current_targets[0] or self._debug:
                 # frame has annotations then include it in output
@@ -88,19 +70,20 @@ class DETRArTrackingBase(nn.Module):
                 targets_flat.extend(current_targets)
 
             for num_frames_lookback in range(1, 1 + max_num_of_frames_lookback):
-                if num_frames_lookback == len(latent_deque):
+                if num_frames_lookback == len(output_deque):
                     # In the beginning of the sequence there's not enough latents for lookback
                     break
 
-                latents = latent_deque[num_frames_lookback]
+                hs_embeds = self.filter_hs_embeds(orig_size, output_deque[num_frames_lookback])
+                current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds)
 
                 zero_batch = torch.zeros_like(batch)
 
                 out, *_ = super().forward(
-                    samples=zero_batch, targets=current_targets, latents=latents
+                    samples=zero_batch, targets=current_targets
                 )
 
-                latent_deque[num_frames_lookback] = out['hs_embed']
+                output_deque[num_frames_lookback] = out
 
                 if 'boxes' in current_targets[0]:
                     current_targets = current_targets.copy()
@@ -115,6 +98,31 @@ class DETRArTrackingBase(nn.Module):
         result['pred_logits'] = torch.cat(result['pred_logits'], dim=0)
         result['pred_boxes'] = torch.cat(result['pred_boxes'], dim=0)
         return result, targets_flat
+
+    def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds):
+        current_targets = current_targets.copy()
+        if len(hs_embeds) > 0:
+            for i, current_target in enumerate(current_targets):
+                current_target['track_query_hs_embeds'] = hs_embeds[i][0]
+                current_target['track_query_boxes'] = hs_embeds[i][1]
+
+        return current_targets
+
+    def filter_hs_embeds(self, orig_size, out):
+        post_process_results = self._obj_detector_post['bbox'](out, orig_size)
+        hs_embeds = []
+        for i, post_process_result in enumerate(post_process_results):
+            track_scores = post_process_result['scores']
+
+            track_keep = torch.logical_and(
+                track_scores > self._track_obj_score_threshold,
+                post_process_result['labels'][:] == 0
+            )
+
+            hs_embeds.append(
+                (out['hs_embed'][i][track_keep], post_process_result['boxes'][track_keep])
+            )
+        return hs_embeds
 
 
 class DETRArTracking(DETRArTrackingBase, DETR):
