@@ -58,7 +58,7 @@ class DETRArTrackingBase(nn.Module):
                     current_target['track_query_hs_embeds'] = hs_embeds[i][0]
                     current_target['track_query_boxes'] = hs_embeds[i][1]
 
-            out, targets_resp, features, memory, hs = self.super().forward(
+            out, targets_resp, features, memory, hs = super().forward(
                 samples=batch, targets=current_targets
             )
 
