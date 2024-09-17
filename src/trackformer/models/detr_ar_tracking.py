@@ -13,10 +13,12 @@ class DETRArTrackingBase(nn.Module):
     def __init__(self,
                  obj_detector_post,
                  track_obj_score_threshold: float = 0.4,
+                 max_num_of_frames_lookback: int = 4,
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
         self._track_obj_score_threshold = track_obj_score_threshold
+        self._max_num_of_frames_lookback = max_num_of_frames_lookback
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()
