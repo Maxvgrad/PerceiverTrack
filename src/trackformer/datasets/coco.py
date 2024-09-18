@@ -26,11 +26,13 @@ class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self,  img_folder, ann_file, transforms, norm_transforms,
                  return_masks=False, overflow_boxes=False, remove_no_obj_imgs=True,
                  prev_frame=False, prev_frame_rnd_augs=0.0, prev_prev_frame=False,
-                 min_num_objects=0, sequence_frames=None, frame_dropout_prob=0.0):
+                 min_num_objects=0, sequence_frames=None, frame_dropout_prob=0.0,
+                 is_deformable_detr_and_mot17=False
+                 ):
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
         self._norm_transforms = norm_transforms
-        self.prepare = ConvertCocoPolysToMask(return_masks, overflow_boxes)
+        self.prepare = ConvertCocoPolysToMask(return_masks, overflow_boxes, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
         self._sequence_frames = sequence_frames
         self._frame_dropout_prob = frame_dropout_prob
 
@@ -226,9 +228,13 @@ def convert_coco_poly_to_mask(segmentations, height, width):
 
 
 class ConvertCocoPolysToMask(object):
-    def __init__(self, return_masks=False, overflow_boxes=False):
+    def __init__(self, return_masks=False, overflow_boxes=False, is_deformable_detr_and_mot17=False):
         self.return_masks = return_masks
         self.overflow_boxes = overflow_boxes
+        # Deformable detr predicts 0 label as person. MOT dataset has category 1 for person.
+        # Original authors introduced a hack where they decrement category at runtime and increment at evaluation
+        self.is_deformable_detr_and_mot17 = is_deformable_detr_and_mot17
+        print(f'Decrement dataset labels: {self.is_deformable_detr_and_mot17}')
 
     def __call__(self, image, target):
         w, h = image.size
@@ -275,7 +281,8 @@ class ConvertCocoPolysToMask(object):
 
         target = {}
         target["boxes"] = boxes
-        target["labels"] = classes
+        if self.is_deformable_detr_and_mot17:
+            target["labels"] = classes - 1
 
         if self.return_masks:
             target["masks"] = masks

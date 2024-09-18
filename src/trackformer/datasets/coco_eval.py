@@ -20,7 +20,7 @@ from ..util.misc import all_gather
 
 
 class CocoEvaluator(object):
-    def __init__(self, coco_gt, iou_types):
+    def __init__(self, coco_gt, iou_types, is_deformable_detr_and_mot17=False):
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
@@ -32,10 +32,15 @@ class CocoEvaluator(object):
 
         self.img_ids = []
         self.eval_imgs = {k: [] for k in iou_types}
+        self._is_deformable_detr_and_mot17 = is_deformable_detr_and_mot17
 
     def update(self, predictions):
         img_ids = list(np.unique(list(predictions.keys())))
         self.img_ids.extend(img_ids)
+
+        if self._is_deformable_detr_and_mot17:
+            for prediction in predictions.values():
+                prediction["labels"] += 1
 
         for iou_type in self.iou_types:
             results = self.prepare(predictions, iou_type)

@@ -189,7 +189,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     base_ds = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = tuple(k for k in ('bbox', 'segm') if k in postprocessors.keys())
-    coco_evaluator = CocoEvaluator(base_ds, iou_types)
+
+    is_deformable_detr_and_mot17 = args.deformable and args.dataset == 'mot'  # There's a potential colision with other MOT datasets
+    coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
     coco_evaluators_per_consecutive_frame_skip_number = []
 
     panoptic_evaluator = None
@@ -260,7 +262,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             for skip_number, r in dict(sorted(results_orig_breakdown_by_consecutive_frame_drop.items())).items():
                 if skip_number == len(coco_evaluators_per_consecutive_frame_skip_number):
                     # Add coco evaluator for dedicated skip frame number
-                    coco_evaluators_per_consecutive_frame_skip_number.append(CocoEvaluator(base_ds, iou_types))
+                    coco_evaluators_per_consecutive_frame_skip_number.append(
+                        CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17))
 
                 coco_evaluators_per_consecutive_frame_skip_number[skip_number].update(r)
 
