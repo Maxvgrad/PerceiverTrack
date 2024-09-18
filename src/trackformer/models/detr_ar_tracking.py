@@ -139,8 +139,8 @@ class DETRArTrackingBase(nn.Module):
                 filtered_logits.append(logits_filtered_batch)
                 filtered_boxes.append(boxes_filtered_batch)
 
-        result['pred_logits'] = torch.cat(filtered_logits, dim=0)
-        result['pred_boxes'] = torch.cat(filtered_boxes, dim=0)
+        result['pred_logits'] = torch.stack(filtered_logits, dim=0)
+        result['pred_boxes'] = torch.stack(filtered_boxes, dim=0)
         return result, targets_flat
 
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds):
