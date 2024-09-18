@@ -96,35 +96,35 @@ class DETRArTrackingBase(nn.Module):
                     result['pred_boxes'].append(out['pred_boxes'])
                     targets_flat.extend(current_targets)
 
-        min_size = min([logit.shape[0] for logit in result['pred_logits']])
+        min_size = min([logit.shape[1] for logit in result['pred_logits']])  # Minimum number of queries
+        sizes = [logit.shape[1] for logit in result['pred_logits']]  # Minimum number of queries
 
         filtered_logits = []
         filtered_boxes = []
 
-        for logits, boxes in zip(result['pred_logits'], result['pred_boxes']):
+        for logits, boxes in zip(result['pred_logits'], result['pred_boxes']):  # Iteration over time
             post_process_results = self._obj_detector_post['bbox'](
                 {'pred_boxes': boxes, 'pred_logits': logits},
                 orig_size
             )
 
             labels = torch.stack([post_process_result['labels'] for post_process_result in post_process_results]) # Corresponding labels
+            scores = torch.stack([post_process_result['scores'] for post_process_result in post_process_results])
 
-            # Step 1: Create a mask for elements where label != 0
-            remove_mask = labels != 0
+            remove_mask = (labels != 0) | (scores < self._track_obj_score_threshold)
 
             for b in range(logits.shape[0]):  # Iterate over each batch
 
                 # Get the number of elements for the current batch
                 num_elements = logits[b].shape[0]
-
                 # Get the indices for the current batch
                 batch_remove_mask = remove_mask[b]
                 batch_remove_indices = torch.where(batch_remove_mask)[0]  # Indices where label != 0 for this batch
 
-                # If the number of elements to remove exceeds (num_elements - min_size), keep only up to the threshold
-                if batch_remove_indices.numel() > (num_elements - min_size):
+                if num_elements > min_size:
                     # Limit the number of indices to remove
                     excess_elements_to_remove = batch_remove_indices[-(num_elements - min_size):]  # Keep only the excess
+
                     batch_final_mask = torch.ones(num_elements, dtype=torch.bool,
                                                   device=logits.device)  # Start with all True
                     batch_final_mask[excess_elements_to_remove] = False  # Set False for excess elements with label != 0
@@ -136,6 +136,7 @@ class DETRArTrackingBase(nn.Module):
                     # If no excess, retain all elements
                     logits_filtered_batch = logits[b]
                     boxes_filtered_batch = boxes[b]
+
                 filtered_logits.append(logits_filtered_batch)
                 filtered_boxes.append(boxes_filtered_batch)
 
