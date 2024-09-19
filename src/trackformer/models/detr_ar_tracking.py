@@ -54,13 +54,13 @@ class DETRArTrackingBase(nn.Module):
                 for current_target in current_targets:
                     current_target['consecutive_frame_skip_number'] = torch.tensor(0, device=batch.device)
 
+            hs_embeds = self.filter_hs_embeds(orig_size, output_deque[0])
+
             current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds)
 
             out, targets_resp, features, memory, hs = super().forward(
                 samples=batch, targets=current_targets
             )
-
-            hs_embeds = self.filter_hs_embeds(orig_size, out)
 
             output_deque.appendleft(out)
 
@@ -97,7 +97,6 @@ class DETRArTrackingBase(nn.Module):
                     targets_flat.extend(current_targets)
 
         min_size = min([logit.shape[1] for logit in result['pred_logits']])  # Minimum number of queries
-        sizes = [logit.shape[1] for logit in result['pred_logits']]  # Minimum number of queries
 
         filtered_logits = []
         filtered_boxes = []
