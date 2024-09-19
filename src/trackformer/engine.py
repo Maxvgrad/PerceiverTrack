@@ -243,6 +243,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 target['image_id'].item(): output
                 for target, output in zip(targets, results_orig) if target['consecutive_frame_skip_number'].item() == 0
             }
+
+            print(len(results_for_no_dropped_frames))
+            print(results_for_no_dropped_frames.keys())
+
             coco_evaluator.update(results_for_no_dropped_frames)
 
             # Break evaluation by the number of dropped frames
@@ -252,6 +256,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 image_id = target['image_id'].item()
 
                 if consecutive_frame_skip_number in results_orig_breakdown_by_consecutive_frame_drop:
+
+                    if image_id in results_orig_breakdown_by_consecutive_frame_drop[consecutive_frame_skip_number]:
+                        print(f'Overriding results for consecutive frame {consecutive_frame_skip_number} image id {image_id}')
+
                     results_orig_breakdown_by_consecutive_frame_drop[consecutive_frame_skip_number][
                         image_id] = output
                 else:
@@ -264,7 +272,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                     # Add coco evaluator for dedicated skip frame number
                     coco_evaluators_per_consecutive_frame_skip_number[skip_number] = CocoEvaluator(
                         base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
-
+                print(f'Update evaluator for {skip_number}')
+                print(len(r))
+                print(r.keys())
+                print(r)
                 coco_evaluators_per_consecutive_frame_skip_number[skip_number].update(r)
 
         if panoptic_evaluator is not None:
