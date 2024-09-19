@@ -39,7 +39,7 @@ class DETRArTrackingBase(nn.Module):
         # e.g. if index is 3 then latent from timestamp-3 was fed into the model 3 times without frame input
         output_deque = deque(maxlen=max_num_of_frames_lookback + 1)
         targets_flat = []
-        hs_embeds = []
+        hs_embeds_prev = []
         orig_size = torch.stack([t[-1]["orig_size"] for t in targets], dim=0).to(src.device)
 
         for timestamp, batch in enumerate(src):
@@ -54,13 +54,13 @@ class DETRArTrackingBase(nn.Module):
                 for current_target in current_targets:
                     current_target['consecutive_frame_skip_number'] = torch.tensor(0, device=batch.device)
 
-            hs_embeds = self.filter_hs_embeds(orig_size, output_deque[0])
-
-            current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds)
+            current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds_prev)
 
             out, targets_resp, features, memory, hs = super().forward(
                 samples=batch, targets=current_targets
             )
+
+            hs_embeds_prev = self.filter_hs_embeds(orig_size, out)
 
             output_deque.appendleft(out)
 
