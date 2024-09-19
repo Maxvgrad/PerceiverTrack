@@ -192,7 +192,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     is_deformable_detr_and_mot17 = args.deformable and args.dataset == 'mot'  # There's a potential colision with other MOT datasets
     coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
-    coco_evaluators_per_consecutive_frame_skip_number = []
+    coco_evaluators_per_consecutive_frame_skip_number = {}
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
@@ -259,11 +259,11 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                         image_id: output
                     }
 
-            for skip_number, r in dict(sorted(results_orig_breakdown_by_consecutive_frame_drop.items())).items():
-                if skip_number == len(coco_evaluators_per_consecutive_frame_skip_number):
+            for skip_number, r in results_orig_breakdown_by_consecutive_frame_drop.items():
+                if skip_number not in coco_evaluators_per_consecutive_frame_skip_number:
                     # Add coco evaluator for dedicated skip frame number
-                    coco_evaluators_per_consecutive_frame_skip_number.append(
-                        CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17))
+                    coco_evaluators_per_consecutive_frame_skip_number[skip_number] = CocoEvaluator(
+                        base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
 
                 coco_evaluators_per_consecutive_frame_skip_number[skip_number].update(r)
 
@@ -287,7 +287,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         coco_evaluator.synchronize_between_processes()
     if coco_evaluators_per_consecutive_frame_skip_number:
         print('Sync breakdown coco evaluators')
-        for ce in coco_evaluators_per_consecutive_frame_skip_number:
+        for _, ce in coco_evaluators_per_consecutive_frame_skip_number.items():
             ce.synchronize_between_processes()
     if panoptic_evaluator is not None:
         panoptic_evaluator.synchronize_between_processes()
@@ -297,8 +297,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         coco_evaluator.accumulate()
         coco_evaluator.summarize()
     if coco_evaluators_per_consecutive_frame_skip_number:
-        print('Accumulating breakdown coco evaluators')
-        for ce in coco_evaluators_per_consecutive_frame_skip_number:
+        for skip_number, ce in coco_evaluators_per_consecutive_frame_skip_number.items():
+            print(f'Accumulating breakdown coco evaluators for skip frame number: {skip_number}')
             ce.accumulate()
             ce.summarize()
     panoptic_res = None
@@ -312,8 +312,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
     if coco_evaluators_per_consecutive_frame_skip_number:
         print('Store coco evaluator breakdown results')
-        for i, ce in enumerate(coco_evaluators_per_consecutive_frame_skip_number):
-            stats[f'coco_eval_bbox_consec_frame_drop_{i}'] = ce.coco_eval['bbox'].stats.tolist()
+        for skip_number, ce in coco_evaluators_per_consecutive_frame_skip_number.items():
+            stats[f'coco_eval_bbox_consec_frame_drop_{skip_number}'] = ce.coco_eval['bbox'].stats.tolist()
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
         stats['PQ_th'] = panoptic_res["Things"]
