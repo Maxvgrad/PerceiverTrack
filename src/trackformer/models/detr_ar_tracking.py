@@ -116,7 +116,7 @@ class DETRArTrackingBase(nn.Module):
 
                     result['pred_logits'].append(out['pred_logits'])
                     result['pred_boxes'].append(out['pred_boxes'])
-                    targets_flat.extend(current_targets)
+                    targets_flat.extend(current_targets_with_input_after_gap)
 
         min_size = min([logit.shape[1] for logit in result['pred_logits']])  # Minimum number of queries
 

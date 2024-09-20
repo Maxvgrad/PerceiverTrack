@@ -242,7 +242,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             results_for_no_dropped_frames = {
                 target['image_id'].item(): output
                 for target, output in zip(targets, results_orig)
-                if 'number_of_consecutive_zero_frame' not in target and '' not in target
+                if 'number_of_consecutive_zero_frame' not in target and
+                   'number_of_consecutive_gap_frame_followed_by_image' not in target
             }
 
             coco_evaluator.update(results_for_no_dropped_frames)
