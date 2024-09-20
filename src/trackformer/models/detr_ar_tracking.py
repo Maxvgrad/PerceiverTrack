@@ -14,7 +14,7 @@ class DETRArTrackingBase(nn.Module):
                  obj_detector_post,
                  track_obj_score_threshold: float = 0.4,
                  max_num_of_frames_lookback: int = 0,
-                 feed_zero_frames_every_timestamp: bool = True
+                 feed_zero_frames_every_timestamp: bool = True,
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
