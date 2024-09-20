@@ -163,6 +163,7 @@ def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
                     tracking_kwargs['track_obj_score_threshold'] = 0.4
                     tracking_kwargs['obj_detector_post'] = obj_detector_post
                     tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
+                    tracking_kwargs['feed_zero_frames_every_timestamp'] = args.feed_zero_frames_every_timestamp
 
                     model = DeformableDETRArTracking(tracking_kwargs, detr_kwargs)
                 else:

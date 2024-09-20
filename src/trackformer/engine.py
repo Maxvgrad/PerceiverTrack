@@ -192,7 +192,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     is_deformable_detr_and_mot17 = args.deformable and args.dataset == 'mot'  # There's a potential colision with other MOT datasets
     coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
-    coco_evaluators_per_consecutive_frame_skip_number = {}
+    coco_evaluators_per_partition_key_and_partition_number_number = {}
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
@@ -241,36 +241,42 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             # It's redundant after we have a breakdown per skip number.
             results_for_no_dropped_frames = {
                 target['image_id'].item(): output
-                for target, output in zip(targets, results_orig) if target['consecutive_frame_skip_number'].item() == 0
+                for target, output in zip(targets, results_orig)
+                if 'number_of_consecutive_zero_frame' not in target and '' not in target
             }
 
             coco_evaluator.update(results_for_no_dropped_frames)
 
+            number_of_consecutive_zero_frame_key = 'number_of_consecutive_zero_frame'
+            number_of_consecutive_gap_frame_followed_by_image_key = 'number_of_consecutive_gap_frame_followed_by_image'
+
             # Break evaluation by the number of dropped frames
-            results_orig_breakdown_by_consecutive_frame_drop = {}
-            for target, output in zip(targets, results_orig):
-                consecutive_frame_skip_number = target['consecutive_frame_skip_number'].item()
-                image_id = target['image_id'].item()
+            results_orig_breakdown_by_consecutive_zero_frame = partition_by(
+                results_orig, targets, number_of_consecutive_zero_frame_key)
 
-                if consecutive_frame_skip_number in results_orig_breakdown_by_consecutive_frame_drop:
+            results_orig_breakdown_by_consecutive_gap_frame_followed_by_image = partition_by(
+                results_orig, targets, number_of_consecutive_gap_frame_followed_by_image_key)
 
-                    if image_id in results_orig_breakdown_by_consecutive_frame_drop[consecutive_frame_skip_number]:
-                        print(f'Warn overriding results for consecutive frame {consecutive_frame_skip_number} image id {image_id}')
+            partition_results = {
+                number_of_consecutive_zero_frame_key: results_orig_breakdown_by_consecutive_zero_frame,
+                number_of_consecutive_gap_frame_followed_by_image_key:
+                    results_orig_breakdown_by_consecutive_gap_frame_followed_by_image,
+            }
 
-                    results_orig_breakdown_by_consecutive_frame_drop[consecutive_frame_skip_number][
-                        image_id] = output
-                else:
-                    results_orig_breakdown_by_consecutive_frame_drop[consecutive_frame_skip_number] = {
-                        image_id: output
-                    }
+            # Init coco evaluator
+            for partition_key, partition_results in partition_results.items():
+                # Ensure we have a dictionary for each partition_key in the main coco_evaluators dictionary
+                if partition_key not in coco_evaluators_per_partition_key_and_partition_number_number:
+                    coco_evaluators_per_partition_key_and_partition_number_number[partition_key] = {}
 
-            for skip_number, r in results_orig_breakdown_by_consecutive_frame_drop.items():
-                if skip_number not in coco_evaluators_per_consecutive_frame_skip_number:
-                    # Add coco evaluator for dedicated skip frame number
-                    coco_evaluators_per_consecutive_frame_skip_number[skip_number] = CocoEvaluator(
-                        base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
+                for skip_number, r in partition_results.items():
+                    if skip_number not in coco_evaluators_per_partition_key_and_partition_number_number[partition_key]:
+                        coco_evaluators_per_partition_key_and_partition_number_number[partition_key][
+                            skip_number] = CocoEvaluator(
+                            base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17
+                        )
 
-                coco_evaluators_per_consecutive_frame_skip_number[skip_number].update(r)
+                    coco_evaluators_per_partition_key_and_partition_number_number[partition_key][skip_number].update(r)
 
         if panoptic_evaluator is not None:
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -290,10 +296,11 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     print("Averaged stats:", metric_logger)
     if coco_evaluator is not None:
         coco_evaluator.synchronize_between_processes()
-    if coco_evaluators_per_consecutive_frame_skip_number:
-        print('Sync breakdown coco evaluators')
-        for _, ce in coco_evaluators_per_consecutive_frame_skip_number.items():
-            ce.synchronize_between_processes()
+    if coco_evaluators_per_partition_key_and_partition_number_number:
+        for partition_key, evaluators in coco_evaluators_per_partition_key_and_partition_number_number.items():
+            print(f'Syncing {partition_key} {len(evaluators)} coco evaluators across processes...')
+            for skip_number, ce in evaluators.items():
+                ce.synchronize_between_processes()
     if panoptic_evaluator is not None:
         panoptic_evaluator.synchronize_between_processes()
 
@@ -301,11 +308,13 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     if coco_evaluator is not None:
         coco_evaluator.accumulate()
         coco_evaluator.summarize()
-    if coco_evaluators_per_consecutive_frame_skip_number:
-        for skip_number, ce in coco_evaluators_per_consecutive_frame_skip_number.items():
-            print(f'Accumulating breakdown coco evaluators for skip frame number: {skip_number}')
-            ce.accumulate()
-            ce.summarize()
+    if coco_evaluators_per_partition_key_and_partition_number_number:
+        for partition_key, evaluators in coco_evaluators_per_partition_key_and_partition_number_number.items():
+            print(f'Accumulating breakdown results {partition_key} {len(evaluators)} coco evaluators')
+            for skip_number, ce in evaluators.items():
+                ce.accumulate()
+                ce.summarize()
+
     panoptic_res = None
     if panoptic_evaluator is not None:
         panoptic_res = panoptic_evaluator.summarize()
@@ -315,10 +324,12 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
         if 'segm' in coco_evaluator.coco_eval:
             stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
-    if coco_evaluators_per_consecutive_frame_skip_number:
-        print('Store coco evaluator breakdown results')
-        for skip_number, ce in coco_evaluators_per_consecutive_frame_skip_number.items():
-            stats[f'coco_eval_bbox_consec_frame_drop_{skip_number}'] = ce.coco_eval['bbox'].stats.tolist()
+    if coco_evaluators_per_partition_key_and_partition_number_number:
+        for partition_key, evaluators in coco_evaluators_per_partition_key_and_partition_number_number.items():
+            print(f'Store {partition_key} {len(evaluators)} coco evaluator breakdown results')
+            for skip_number, ce in evaluators.items():
+                stats[f'coco_eval_bbox_{partition_key}_{skip_number}'] = ce.coco_eval['bbox'].stats.tolist()
+
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
         stats['PQ_th'] = panoptic_res["Things"]
@@ -400,3 +411,28 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         exit()
 
     return stats, eval_stats, coco_evaluator
+
+
+def partition_by(results_orig, targets, partition_key):
+    result = {}
+    for target, output in zip(targets, results_orig):
+
+        if partition_key not in target:
+            continue
+
+        partition_number = target[partition_key].item()
+        image_id = target['image_id'].item()
+
+        if partition_number in result:
+
+            if image_id in result[partition_number]:
+                print(
+                    f'Warn overriding results for partition key {partition_key} '
+                    f'number {partition_number} image id {image_id}'
+                )
+            result[partition_number][image_id] = output
+        else:
+            result[partition_number] = {
+                image_id: output
+            }
+    return result

@@ -14,12 +14,14 @@ class DETRArTrackingBase(nn.Module):
                  obj_detector_post,
                  track_obj_score_threshold: float = 0.4,
                  max_num_of_frames_lookback: int = 0,
+                 feed_zero_frames_every_timestamp: bool = True
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
         self._track_obj_score_threshold = track_obj_score_threshold
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
+        self._feed_zero_frames_every_timestamp = feed_zero_frames_every_timestamp
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()
@@ -50,9 +52,6 @@ class DETRArTrackingBase(nn.Module):
                 frame_keep_mask = torch.tensor(frame_keep_mask, device=batch.device)
                 frame_keep_mask = frame_keep_mask.view(-1, 1, 1, 1)
                 batch = batch * frame_keep_mask
-            else:
-                for current_target in current_targets:
-                    current_target['consecutive_frame_skip_number'] = torch.tensor(0, device=batch.device)
 
             current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds_prev)
 
@@ -70,6 +69,7 @@ class DETRArTrackingBase(nn.Module):
                 result['pred_boxes'].append(out['pred_boxes'])
                 targets_flat.extend(current_targets)
 
+            # We expect this for loop to run only during evaluation
             for num_frames_lookback in range(1, 1 + max_num_of_frames_lookback):
                 if num_frames_lookback == len(output_deque):
                     # In the beginning of the sequence there's not enough latents for lookback
@@ -78,19 +78,41 @@ class DETRArTrackingBase(nn.Module):
                 hs_embeds = self.filter_hs_embeds(orig_size, output_deque[num_frames_lookback])
                 current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds)
 
-                zero_batch = torch.zeros_like(batch)
+                if self._feed_zero_frames_every_timestamp:
+                    # Experiment where the model is supposed to receive input at every timestamp.
+                    # We assume the input is not available, so we feed a zero image as input.
+                    # This allows us to evaluate how well the model can predict a new object position without actual input.
+                    zero_batch = torch.zeros_like(batch)
+                    out, *_ = super().forward(
+                        samples=zero_batch, targets=current_targets
+                    )
+                    output_deque[num_frames_lookback] = out
 
-                out, *_ = super().forward(
-                    samples=zero_batch, targets=current_targets
-                )
+                    if 'boxes' in current_targets[0]:
+                        current_targets_zero = [current_target.copy() for current_target in current_targets]
+                        for current_target in current_targets_zero:
+                            # Frame_1 Frame_zero_2 Frame_zero_3 Frame_zero_3
+                            current_target['number_of_consecutive_zero_frame'] = torch.tensor(
+                                num_frames_lookback, device=batch.device)
 
-                output_deque[num_frames_lookback] = out
+                        result['pred_logits'].append(out['pred_logits'])
+                        result['pred_boxes'].append(out['pred_boxes'])
+                        targets_flat.extend(current_targets_zero)
 
-                if 'boxes' in current_targets[0]:
-                    current_targets = current_targets.copy()
-                    current_targets = [current_target.copy() for current_target in current_targets]
-                    for current_target in current_targets:
-                        current_target['consecutive_frame_skip_number'] = torch.tensor(num_frames_lookback, device=batch.device)
+                if num_frames_lookback > 1 and 'boxes' in current_targets[0]:
+                    # Experiment to evaluate how well the model can predict an object's position after a time gap
+                    # where the input was either skipped or replaced with zero images due to missing data.
+                    out, *_ = super().forward(
+                        samples=batch, targets=current_targets
+                    )
+
+                    current_targets_with_input_after_gap = [current_target.copy() for current_target in current_targets]
+                    for current_target in current_targets_with_input_after_gap:
+                        assert 'number_of_consecutive_zero_frame' not in current_target
+                        # Frame_1 Frame_zero_2 Frame_zero_3 Frame_4
+                        current_target[
+                            'number_of_consecutive_gap_frame_followed_by_image'] = (
+                            torch.tensor(num_frames_lookback-1, device=batch.device))
 
                     result['pred_logits'].append(out['pred_logits'])
                     result['pred_boxes'].append(out['pred_boxes'])
