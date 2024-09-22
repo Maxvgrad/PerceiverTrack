@@ -156,11 +156,12 @@ def build_mot(image_set, args):
         return_masks=args.masks,
         overflow_boxes=args.overflow_boxes,
         remove_no_obj_imgs=False,
-        prev_frame=args.tracking,
+        prev_frame=args.tracking and not (hasattr(args, 'sequence_frames') and args.sequence_frames > 1),
         prev_frame_rnd_augs=prev_frame_rnd_augs,
         prev_prev_frame=args.track_prev_prev_frame,
         sequence_frames=args.sequence_frames,
         frame_dropout_prob=args.frame_dropout_prob,
+        is_deformable_detr_and_mot17=(args.deformable and args.dataset == 'mot'),
     )
 
     return dataset

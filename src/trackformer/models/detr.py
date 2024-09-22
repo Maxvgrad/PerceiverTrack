@@ -477,6 +477,7 @@ class PostProcess(nn.Module):
 
         boxes = self.process_boxes(out_bbox, target_sizes)
 
+
         results = [
             {'scores': s, 'labels': l, 'boxes': b, 'scores_no_object': s_n_o}
             for s, l, b, s_n_o in zip(scores, labels, boxes, prob[..., -1])]

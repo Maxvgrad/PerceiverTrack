@@ -7,6 +7,7 @@ from .backbone import build_backbone
 from .deformable_detr import DeformableDETR, DeformablePostProcess
 from .deformable_transformer import build_deforamble_transformer
 from .detr import DETR, PostProcess, SetCriterion
+from .detr_ar_tracking import DeformableDETRArTracking
 from .detr_segmentation import (DeformableDETRSegm, DeformableDETRSegmTracking,
                                 DETRSegm, DETRSegmTracking,
                                 PostProcessPanoptic, PostProcessSegm)
@@ -49,10 +50,20 @@ def build_model(args):
     device = torch.device(args.device)
     matcher = build_matcher(args)
 
+    if args.focal_loss:
+        postprocessors = {'bbox': DeformablePostProcess()}
+    else:
+        postprocessors = {'bbox': PostProcess()}
+    if args.masks:
+        postprocessors['segm'] = PostProcessSegm()
+        if args.dataset == "coco_panoptic":
+            is_thing_map = {i: i <= 90 for i in range(201)}
+            postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
+
     if hasattr(args, 'model') and args.model == 'perceiver':
         model = build_model_perceiver_based(args, matcher, num_classes)
     else:
-        model = build_model_detr_based(args, matcher, num_classes)
+        model = build_model_detr_based(args, matcher, num_classes, postprocessors)
 
     weight_dict = {'loss_ce': args.cls_loss_coef,
                    'loss_bbox': args.bbox_loss_coef,
@@ -89,16 +100,6 @@ def build_model(args):
         track_query_false_positive_eos_weight=args.track_query_false_positive_eos_weight,)
     criterion.to(device)
 
-    if args.focal_loss:
-        postprocessors = {'bbox': DeformablePostProcess()}
-    else:
-        postprocessors = {'bbox': PostProcess()}
-    if args.masks:
-        postprocessors['segm'] = PostProcessSegm()
-        if args.dataset == "coco_panoptic":
-            is_thing_map = {i: i <= 90 for i in range(201)}
-            postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
-
     return model, criterion, postprocessors
 
 
@@ -127,7 +128,7 @@ def build_model_perceiver_based(args, matcher, num_classes):
     return model
 
 
-def build_model_detr_based(args, matcher, num_classes):
+def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
     backbone = build_backbone(args)
     detr_kwargs = {
         'backbone': backbone,
@@ -157,7 +158,16 @@ def build_model_detr_based(args, matcher, num_classes):
             if args.masks:
                 model = DeformableDETRSegmTracking(mask_kwargs, tracking_kwargs, detr_kwargs)
             else:
-                model = DeformableDETRTracking(tracking_kwargs, detr_kwargs)
+                if hasattr(args, 'sequence_frames') and args.sequence_frames > 1:
+                    print(f'Building autoregressive deformable detr model')
+                    tracking_kwargs['track_obj_score_threshold'] = 0.4
+                    tracking_kwargs['obj_detector_post'] = obj_detector_post
+                    tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
+                    tracking_kwargs['feed_zero_frames_every_timestamp'] = args.feed_zero_frames_every_timestamp
+
+                    model = DeformableDETRArTracking(tracking_kwargs, detr_kwargs)
+                else:
+                    model = DeformableDETRTracking(tracking_kwargs, detr_kwargs)
         else:
             if args.masks:
                 model = DeformableDETRSegm(mask_kwargs, detr_kwargs)

@@ -275,11 +275,19 @@ def train(args: Namespace) -> None:
                     visualizers[k][k_inner].win = checkpoint['vis_win_names'][k][k_inner]
 
     if args.eval_only:
-        _, _, coco_evaluator = evaluate(
+        test_stats, val_stats, coco_evaluator = evaluate(
             model, criterion, postprocessors, data_loader_val, device,
             output_dir, visualizers['val'], args, 0)
         if args.output_dir:
             utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
+
+        flattened_test_stats = create_flat_test_stats(test_stats)
+
+        log_stats = {**{f'test_{k}': v for k, v in flattened_test_stats.items()},
+                     'epoch': 1,
+                     'n_parameters': n_parameters}
+
+        wandb.log(log_stats, step=1)
 
         return
 
@@ -334,23 +342,7 @@ def train(args: Namespace) -> None:
                 if b_s == s:
                     checkpoint_paths.append(output_dir / f"checkpoint_best_{n}.pth")
 
-        prefix_dict = {'coco_eval_bbox': [
-                'AP_IoU_50_to_95_area_all_maxDet_100',
-                'AP_IoU_50_area_all_maxDet_100',
-                'AP_IoU_75_area_all_maxDet_100',
-                'AP_IoU_50_to_95_area_small_maxDet_100',
-                'AP_IoU_50_to_95_area_medium_maxDet_100',
-                'AP_IoU_50_to_95_area_large_maxDet_100',
-                'AR_IoU_50_to_95_area_all_maxDet_1',
-                'AR_IoU_50_to_95_area_all_maxDet_10',
-                'AR_IoU_50_to_95_area_all_maxDet_100',
-                'AR_IoU_50_to_95_area_small_maxDet_100',
-                'AR_IoU_50_to_95_area_medium_maxDet_100',
-                'AR_IoU_50_to_95_area_large_maxDet_100'
-            ]
-        }
-
-        flattened_test_stats = utils.flatten_stats(test_stats, prefix_dict)
+        flattened_test_stats = create_flat_test_stats(test_stats)
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                      **{f'test_{k}': v for k, v in flattened_test_stats.items()},
@@ -382,6 +374,26 @@ def train(args: Namespace) -> None:
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
     utils.destroy_distributed_mode(args)
+
+
+def create_flat_test_stats(test_stats):
+    prefix_dict = {'coco_eval_bbox': [
+        'AP_IoU_50_to_95_area_all_maxDet_100',
+        'AP_IoU_50_area_all_maxDet_100',
+        'AP_IoU_75_area_all_maxDet_100',
+        'AP_IoU_50_to_95_area_small_maxDet_100',
+        'AP_IoU_50_to_95_area_medium_maxDet_100',
+        'AP_IoU_50_to_95_area_large_maxDet_100',
+        'AR_IoU_50_to_95_area_all_maxDet_1',
+        'AR_IoU_50_to_95_area_all_maxDet_10',
+        'AR_IoU_50_to_95_area_all_maxDet_100',
+        'AR_IoU_50_to_95_area_small_maxDet_100',
+        'AR_IoU_50_to_95_area_medium_maxDet_100',
+        'AR_IoU_50_to_95_area_large_maxDet_100'
+    ]
+    }
+    flattened_test_stats = utils.flatten_stats(test_stats, prefix_dict)
+    return flattened_test_stats
 
 
 @ex.main

@@ -10,4 +10,6 @@ epochs: 50
 lr_drop: 10
 
 # Evaluation
-max_num_of_frames_lookback: 0
+max_num_of_frames_lookback: 6
+
+sequence_frames: 7
