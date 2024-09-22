@@ -47,6 +47,11 @@ def parse_args():
                             'CAM_BACK', 'CAM_BACK_LEFT', 'CAM_BACK_RIGHT', 'CAM_FRONT',
                             'CAM_FRONT_LEFT', 'CAM_FRONT_RIGHT'
                         ])
+    parser.add_argument('--categories', type=str, nargs='+', default=[
+        'car', 'truck', 'trailer', 'bus', 'construction_vehicle',
+        'bicycle', 'motorcycle', 'pedestrian', 'traffic_cone',
+        'barrier'
+    ])
     args = parser.parse_args()
     return args
 
@@ -98,6 +103,8 @@ def get_img_annos(nuim, img_info, cat2id, out_dir, data_root, seg_root):
 
         if category_name in NAME_MAPPING:
             cat_name = NAME_MAPPING[category_name]
+            if cat_name not in cat2id:
+                continue
             cat_id = cat2id[cat_name]
 
             x_min, y_min, x_max, y_max = ann['bbox']
@@ -115,11 +122,14 @@ def get_img_annos(nuim, img_info, cat2id, out_dir, data_root, seg_root):
     return annotations, 0
 
 
-def export_nuim_to_coco(nuim, data_root, out_dir, extra_tag, version, nproc, cameras):
+def export_nuim_to_coco(nuim, data_root, out_dir, extra_tag, version, nproc, cameras, categories_to_keep):
     print('Process category information')
-    categories = [dict(id=nus_categories.index(cat_name), name=cat_name)
-                  for cat_name in nus_categories]
+    nus_categories_filtered = filter(lambda c: c in categories_to_keep, nus_categories)
+    categories = [dict(id=nus_categories_filtered.index(cat_name), name=cat_name)
+                  for cat_name in nus_categories_filtered]
     cat2id = {k_v['name']: k_v['id'] for k_v in categories}
+
+    print(f'Categories: {categories}')
 
     images = []
     past_images = []
@@ -191,7 +201,8 @@ def main():
     for version in args.version:
         print(f'Converting {version} dataset to COCO format...')
         nuim = NuImages(dataroot=args.data_root, version=version, verbose=True, lazy=True)
-        export_nuim_to_coco(nuim, args.data_root, args.out_dir, args.extra_tag, version, args.nproc, args.cameras)
+        export_nuim_to_coco(nuim, args.data_root, args.out_dir, args.extra_tag, version, args.nproc, args.cameras,
+                            args.categories)
 
 
 if __name__ == '__main__':
