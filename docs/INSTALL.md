@@ -83,7 +83,8 @@
          --data-root ./data/nuimages \
          --version v1.0-train v1.0-val \
          --out-dir ./data/nuimages/annotations/ \
-         --cameras CAM_FRONT
+         --cameras CAM_FRONT \
+         --categories pedestrian
        ```
 
 3. Download and unpack pretrained TrackFormer model files in the `models` directory:
