@@ -124,7 +124,7 @@ def get_img_annos(nuim, img_info, cat2id, out_dir, data_root, seg_root):
 
 def export_nuim_to_coco(nuim, data_root, out_dir, extra_tag, version, nproc, cameras, categories_to_keep):
     print('Process category information')
-    nus_categories_filtered = filter(lambda c: c in categories_to_keep, nus_categories)
+    nus_categories_filtered = (c for c in nus_categories if c in categories_to_keep)
     categories = [dict(id=nus_categories_filtered.index(cat_name), name=cat_name)
                   for cat_name in nus_categories_filtered]
     cat2id = {k_v['name']: k_v['id'] for k_v in categories}
