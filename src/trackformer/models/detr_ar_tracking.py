@@ -174,7 +174,7 @@ class DETRArTrackingBase(nn.Module):
             for i, current_target in enumerate(current_targets):
                 current_target['track_query_hs_embeds'] = hs_embeds[i][0]
                 current_target['track_query_boxes'] = hs_embeds[i][1]
-                current_target['num_prev_track_queries_used'] = 0 if i >= len(num_track_queries_reused) else num_track_queries_reused[i]
+                current_target['num_prev_track_queries_used'] = torch.tensor(0) if i >= len(num_track_queries_reused) else num_track_queries_reused[i]
 
         return current_targets
 
