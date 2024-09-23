@@ -42,6 +42,7 @@ class DETRArTrackingBase(nn.Module):
         output_deque = deque(maxlen=max_num_of_frames_lookback + 1)
         targets_flat = []
         hs_embeds_prev = []
+        num_track_queries_reused_prev = []
         orig_size = torch.stack([t[-1]["orig_size"] for t in targets], dim=0).to(src.device)
 
         for timestamp, batch in enumerate(src):
@@ -53,13 +54,14 @@ class DETRArTrackingBase(nn.Module):
                 frame_keep_mask = frame_keep_mask.view(-1, 1, 1, 1)
                 batch = batch * frame_keep_mask
 
-            current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds_prev)
+            current_targets = self.populate_targets_with_query_hs_and_reference_boxes(
+                current_targets, hs_embeds_prev, num_track_queries_reused_prev)
 
             out, targets_resp, features, memory, hs = super().forward(
                 samples=batch, targets=current_targets
             )
 
-            hs_embeds_prev = self.filter_hs_embeds(orig_size, out)
+            hs_embeds_prev, num_track_queries_reused_prev = self.filter_hs_embeds(orig_size, out)
 
             output_deque.appendleft(out)
 
@@ -75,8 +77,9 @@ class DETRArTrackingBase(nn.Module):
                     # In the beginning of the sequence there's not enough latents for lookback
                     break
 
-                hs_embeds = self.filter_hs_embeds(orig_size, output_deque[num_frames_lookback])
-                current_targets = self.populate_targets_with_query_hs_and_reference_boxes(current_targets, hs_embeds)
+                hs_embeds, num_track_queries_reused = self.filter_hs_embeds(orig_size, output_deque[num_frames_lookback])
+                current_targets = self.populate_targets_with_query_hs_and_reference_boxes(
+                    current_targets, hs_embeds, num_track_queries_reused)
 
                 if self._feed_zero_frames_every_timestamp:
                     # Experiment where the model is supposed to receive input at every timestamp.
@@ -165,18 +168,20 @@ class DETRArTrackingBase(nn.Module):
         result['pred_boxes'] = torch.stack(filtered_boxes, dim=0)
         return result, targets_flat
 
-    def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds):
+    def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
         current_targets = current_targets.copy()
         if len(hs_embeds) > 0:
             for i, current_target in enumerate(current_targets):
                 current_target['track_query_hs_embeds'] = hs_embeds[i][0]
                 current_target['track_query_boxes'] = hs_embeds[i][1]
+                current_target['num_prev_track_queries_used'] = 0 if i >= len(num_track_queries_reused) else num_track_queries_reused[i]
 
         return current_targets
 
     def filter_hs_embeds(self, orig_size, out):
         post_process_results = self._obj_detector_post['bbox'](out, orig_size)
         hs_embeds = []
+        num_track_queries_reused = []
         for i, post_process_result in enumerate(post_process_results):
             track_scores = post_process_result['scores']
 
@@ -185,10 +190,14 @@ class DETRArTrackingBase(nn.Module):
                 post_process_result['labels'][:] == 0
             )
 
+            track_scored_prev = track_scores[:-self.num_queries]
+            num_track_scored_prev_true = torch.sum(track_scored_prev > 0)
+            num_track_queries_reused.append(num_track_scored_prev_true)
             hs_embeds.append(
                 (out['hs_embed'][i][track_keep], post_process_result['boxes'][track_keep])
             )
-        return hs_embeds
+            num_track_queries_reused.append(num_track_queries_reused)
+        return hs_embeds, num_track_queries_reused
 
 
 class DETRArTracking(DETRArTrackingBase, DETR):
