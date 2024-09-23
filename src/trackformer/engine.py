@@ -256,19 +256,19 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 number_of_consecutive_zero_frame_key,
                 lambda t: number_of_consecutive_zero_frame_key in t,
                 prev_track_query_use_per_partition_key,
-                results_orig
+                targets
             )
             calculate_mean_prev_tracks_queries_used(
                 number_of_consecutive_gap_frame_followed_by_image_key,
                 lambda t: number_of_consecutive_gap_frame_followed_by_image_key in t,
                 prev_track_query_use_per_partition_key,
-                results_orig
+                targets
             )
             calculate_mean_prev_tracks_queries_used(
                 'default',
                 lambda t: number_of_consecutive_gap_frame_followed_by_image_key not in t and number_of_consecutive_zero_frame_key not in t,
                 prev_track_query_use_per_partition_key,
-                results_orig
+                targets
             )
 
             # Break evaluation by the number of dropped frames
@@ -354,7 +354,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     if prev_track_query_use_per_partition_key:
         for partition_key, number_of_prev_track_query_used in prev_track_query_use_per_partition_key:
             stats[f'prev_track_query_{partition_key}'] = (
-                torch.mean(torch.stack(number_of_prev_track_query_used))).item()
+                torch.mean(torch.stack(number_of_prev_track_query_used).float())).item()
 
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
@@ -449,7 +449,7 @@ def calculate_mean_prev_tracks_queries_used(
     if len(num_prev_track_queries_used_tensor) == 0:
         return
 
-    num_prev_track_queries_used_tensor_average = torch.mean(torch.stack(num_prev_track_queries_used_tensor))
+    num_prev_track_queries_used_tensor_average = torch.mean(torch.stack(num_prev_track_queries_used_tensor).float())
     if partition_key not in result_dict:
         result_dict[partition_key] = []
     result_dict[partition_key].append(
