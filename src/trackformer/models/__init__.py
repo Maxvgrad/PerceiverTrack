@@ -43,7 +43,8 @@ def build_model(args):
             # so N is 1, but according to DETR paper we add 1 (account for zero indexed array)
             num_classes = 2
     elif args.dataset == 'nuimages':
-        num_classes = 10 # 9 + 1 (account for zero indexed array)
+        # num_classes = 10 # 9 + 1 (account for zero indexed array)
+        num_classes = 20
     else:
         raise NotImplementedError
 

@@ -81,7 +81,7 @@
         ```
        python src/generate_coco_from_nuimages.py \
          --data-root ./data/nuimages \
-         --version v1.0-train v1.0-val \
+         --version v1.0-mini  v1.0-test  v1.0-train  v1.0-val \
          --out-dir ./data/nuimages/annotations/ \
          --cameras CAM_FRONT \
          --categories pedestrian
