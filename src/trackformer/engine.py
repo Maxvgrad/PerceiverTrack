@@ -352,7 +352,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 stats[f'coco_eval_bbox_{partition_key}_{skip_number}'] = ce.coco_eval['bbox'].stats.tolist()
 
     if prev_track_query_use_per_partition_key:
-        for partition_key, number_of_prev_track_query_used in prev_track_query_use_per_partition_key:
+        for partition_key, number_of_prev_track_query_used in prev_track_query_use_per_partition_key.items():
             stats[f'prev_track_query_{partition_key}'] = (
                 torch.mean(torch.stack(number_of_prev_track_query_used).float())).item()
 
