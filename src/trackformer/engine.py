@@ -442,7 +442,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 def calculate_mean_prev_tracks_queries_used(
         partition_key, partition_predicate, result_dict, targets
 ):
-    num_prev_track_queries_used_tensor = [t['num_prev_track_queries_used'] for t in targets if partition_predicate(t) if 'num_prev_track_queries_used' in t]
+    num_prev_track_queries_used_tensor = [
+        t['num_prev_track_queries_used']
+        for t in targets if partition_predicate(t) and 'num_prev_track_queries_used' in t]
 
     if len(num_prev_track_queries_used_tensor) == 0:
         return
