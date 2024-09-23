@@ -193,6 +193,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     is_deformable_detr_and_mot17 = args.deformable and args.dataset == 'mot'  # There's a potential colision with other MOT datasets
     coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
     coco_evaluators_per_partition_key_and_partition_number_number = {}
+    prev_track_query_use_per_partition_key = {}
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
@@ -250,6 +251,25 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
             number_of_consecutive_zero_frame_key = 'number_of_consecutive_zero_frame'
             number_of_consecutive_gap_frame_followed_by_image_key = 'number_of_consecutive_gap_frame_followed_by_image'
+
+            calculate_mean_prev_tracks_queries_used(
+                number_of_consecutive_zero_frame_key,
+                lambda t: number_of_consecutive_zero_frame_key in t,
+                prev_track_query_use_per_partition_key,
+                results_orig
+            )
+            calculate_mean_prev_tracks_queries_used(
+                number_of_consecutive_gap_frame_followed_by_image_key,
+                lambda t: number_of_consecutive_gap_frame_followed_by_image_key in t,
+                prev_track_query_use_per_partition_key,
+                results_orig
+            )
+            calculate_mean_prev_tracks_queries_used(
+                'default',
+                lambda t: number_of_consecutive_gap_frame_followed_by_image_key not in t and number_of_consecutive_zero_frame_key not in t,
+                prev_track_query_use_per_partition_key,
+                results_orig
+            )
 
             # Break evaluation by the number of dropped frames
             results_orig_breakdown_by_consecutive_zero_frame = partition_by(
@@ -330,6 +350,11 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             print(f'Store {partition_key} {len(evaluators)} coco evaluator breakdown results')
             for skip_number, ce in evaluators.items():
                 stats[f'coco_eval_bbox_{partition_key}_{skip_number}'] = ce.coco_eval['bbox'].stats.tolist()
+
+    if prev_track_query_use_per_partition_key:
+        for partition_key, number_of_prev_track_query_used in prev_track_query_use_per_partition_key:
+            stats[f'prev_track_query_{partition_key}'] = (
+                torch.mean(torch.stack(number_of_prev_track_query_used))).item()
 
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
@@ -412,6 +437,22 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         exit()
 
     return stats, eval_stats, coco_evaluator
+
+
+def calculate_mean_prev_tracks_queries_used(
+        partition_key, partition_predicate, result_dict, targets
+):
+    num_prev_track_queries_used_tensor = [t['num_prev_track_queries_used'] for t in targets if partition_predicate(t)]
+
+    if len(num_prev_track_queries_used_tensor) == 0:
+        return
+
+    num_prev_track_queries_used_tensor_average = torch.mean(torch.stack(num_prev_track_queries_used_tensor))
+    if partition_key not in result_dict:
+        result_dict[partition_key] = []
+    result_dict[partition_key].append(
+        num_prev_track_queries_used_tensor_average
+    )
 
 
 def partition_by(results_orig, targets, partition_key):
