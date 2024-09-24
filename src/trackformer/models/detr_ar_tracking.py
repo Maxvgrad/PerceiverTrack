@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from .deformable_detr import DeformableDETR
 from .detr import DETR
-from ..util.misc import NestedTensor
+from ..util.misc import NestedTensor, nested_tensor_from_tensor_list
 
 
 class DETRArTrackingBase(nn.Module):
@@ -53,6 +53,7 @@ class DETRArTrackingBase(nn.Module):
                 frame_keep_mask = torch.tensor(frame_keep_mask, device=batch.device)
                 frame_keep_mask = frame_keep_mask.view(-1, 1, 1, 1)
                 batch = batch * frame_keep_mask
+                #TODO make NESTED tensor
 
             current_targets = self.populate_targets_with_query_hs_and_reference_boxes(
                 current_targets, hs_embeds_prev, num_track_queries_reused_prev)
@@ -86,8 +87,12 @@ class DETRArTrackingBase(nn.Module):
                     # We assume the input is not available, so we feed a zero image as input.
                     # This allows us to evaluate how well the model can predict a new object position without actual input.
                     zero_batch = torch.zeros_like(batch)
+                    zero_samples = nested_tensor_from_tensor_list(zero_batch)
+                    zero_mask = torch.ones(zero_samples.mask.shape, dtype=torch.bool, device=batch.device)
+                    zero_samples = NestedTensor(zero_samples.tensors, zero_mask)
+
                     out, *_ = super().forward(
-                        samples=zero_batch, targets=current_targets
+                        samples=zero_samples, targets=current_targets
                     )
                     output_deque[num_frames_lookback] = out
 
