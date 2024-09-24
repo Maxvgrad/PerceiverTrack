@@ -12,6 +12,7 @@ import sacred
 import torch
 import wandb
 import yaml
+from torch.nn.init import constant_
 from torch.utils.data import DataLoader, DistributedSampler
 
 import trackformer.util.misc as utils
@@ -247,6 +248,12 @@ def train(args: Namespace) -> None:
                     resume_state_dict[k] = checkpoint_mask_head['model'][k]
 
         model_without_ddp.load_state_dict(resume_state_dict)
+
+        if hasattr(model_without_ddp, 'transformer') and hasattr(model_without_ddp, 'decoder'):
+            for l in model_without_ddp.transformer.decoder.layers:
+                if hasattr(l, 'cross_attn') and hasattr(l.cross_attn, 'output_proj'):
+                    constant_(l.cross_attn.output_proj.bias.data, 0.)
+                    print(f'Reset bias of {l.cross_attn.output_proj} to 0.')
 
         # RESUME OPTIM
         if not args.eval_only and args.resume_optim:
