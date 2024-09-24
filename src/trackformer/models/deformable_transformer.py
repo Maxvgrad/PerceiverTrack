@@ -374,19 +374,6 @@ class DeformableTransformerDecoderLayer(nn.Module):
         tgt2 = self.cross_attn(self.with_pos_embed(tgt, query_pos),
                                reference_points,
                                src, src_spatial_shapes, src_padding_mask, query_attn_mask)
-
-        threshold = 1e-6  # Define a small threshold
-
-        print(f"src_padding_mask: {src_padding_mask.shape}")
-        print(f"src_padding_mask: {src_padding_mask}")
-        print(f"tgt2: {tgt2.shape}")
-        print(f"tgt2: {tgt2}")
-
-        if torch.all(torch.abs(tgt2) < threshold):
-            print("All elements in tgt2 are zero.")
-        else:
-            print("Not all elements in tgt2 are zero.")
-
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
 
