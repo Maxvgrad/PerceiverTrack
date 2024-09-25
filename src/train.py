@@ -249,7 +249,8 @@ def train(args: Namespace) -> None:
 
         model_without_ddp.load_state_dict(resume_state_dict)
 
-        if hasattr(model_without_ddp, 'transformer') and hasattr(model_without_ddp.transformer, 'decoder'):
+        if (args.reset_decoder_output_proj_bias
+                and hasattr(model_without_ddp, 'transformer') and hasattr(model_without_ddp.transformer, 'decoder')):
             for l in model_without_ddp.transformer.decoder.layers:
                 if hasattr(l, 'cross_attn') and hasattr(l.cross_attn, 'output_proj'):
                     constant_(l.cross_attn.output_proj.bias.data, 0.)
