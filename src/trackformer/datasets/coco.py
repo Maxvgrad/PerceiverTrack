@@ -281,6 +281,7 @@ class ConvertCocoPolysToMask(object):
 
         target = {}
         target["boxes"] = boxes
+        target["labels"] = classes
         if self.is_deformable_detr_and_mot17:
             target["labels"] = classes - 1
 
