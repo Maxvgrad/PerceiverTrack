@@ -41,48 +41,53 @@ class DETRArTrackingBase(nn.Module):
         # e.g. if index is 3 then latent from timestamp-3 was fed into the model 3 times without frame input
         output_deque = deque(maxlen=max_num_of_frames_lookback + 1)
         targets_flat = []
-        hs_embeds_prev = []
         num_track_queries_reused_prev = []
         orig_size = torch.stack([t[-1]["orig_size"] for t in targets], dim=0).to(src.device)
 
+        out_baseline = None
+        out_blind = None
+        out_gap = None
+
         for timestamp, batch in enumerate(src):
-            current_targets = [target_list[timestamp] for target_list in targets]
+            current_targets_base = [target_list[timestamp] for target_list in targets]
+            has_ground_truth = 'boxes' in current_targets_base[0]
 
             if self.training:
-                frame_keep_mask = [t['keep_frame'] for t in current_targets]
+                frame_keep_mask = [t['keep_frame'] for t in current_targets_base]
                 frame_keep_mask = torch.tensor(frame_keep_mask, device=batch.device)
                 frame_keep_mask = frame_keep_mask.view(-1, 1, 1, 1)
                 batch = batch * frame_keep_mask
                 #TODO make NESTED tensor
 
-            current_targets = self.populate_targets_with_query_hs_and_reference_boxes(
-                current_targets, hs_embeds_prev, num_track_queries_reused_prev)
+            current_targets_baseline = current_targets_base
+            # Experiment: Baseline
+            if out_baseline:
+                # Populate a previous hidden state
+                hs_embeds_prev, num_track_queries_reused_prev = self.filter_hs_embeds(orig_size, out_baseline)
+                current_targets_baseline = self.populate_targets_with_query_hs_and_reference_boxes(
+                    current_targets_base, hs_embeds_prev, num_track_queries_reused_prev)
 
-            out, targets_resp, features, memory, hs = super().forward(
-                samples=batch, targets=current_targets
+            out_baseline, targets_resp, features, memory, hs = super().forward(
+                samples=batch, targets=current_targets_baseline
             )
 
-            hs_embeds_prev, num_track_queries_reused_prev = self.filter_hs_embeds(orig_size, out)
+            if has_ground_truth:
+                # If we have a ground truth for this timestamp
+                self.populate_results(
+                    batch.device, current_targets_baseline, out_baseline, result, targets_flat, timestamp, 'baseline'
+                )
 
-            output_deque.appendleft(out)
+            # Evaluation experiments
+            if not self.training:
 
-            if 'boxes' in current_targets[0] or self._debug:
-                # frame has annotations then include it in output
-                result['pred_logits'].append(out['pred_logits'])
-                result['pred_boxes'].append(out['pred_boxes'])
-                targets_flat.extend(current_targets)
+                # Experiment: blind
+                if timestamp > 1:
+                    current_targets_blind = current_targets_base
+                    if out_blind:
+                        hs_embeds, num_track_queries_reused = self.filter_hs_embeds(orig_size, out_blind)
+                        current_targets_blind = self.populate_targets_with_query_hs_and_reference_boxes(
+                            current_targets_blind, hs_embeds, num_track_queries_reused)
 
-            # We expect this for loop to run only during evaluation
-            for num_frames_lookback in range(1, 1 + max_num_of_frames_lookback):
-                if num_frames_lookback == len(output_deque):
-                    # In the beginning of the sequence there's not enough latents for lookback
-                    break
-
-                hs_embeds, num_track_queries_reused = self.filter_hs_embeds(orig_size, output_deque[num_frames_lookback])
-                current_targets = self.populate_targets_with_query_hs_and_reference_boxes(
-                    current_targets, hs_embeds, num_track_queries_reused)
-
-                if self._feed_zero_frames_every_timestamp:
                     # Experiment where the model is supposed to receive input at every timestamp.
                     # We assume the input is not available, so we feed a zero image as input.
                     # This allows us to evaluate how well the model can predict a new object position without actual input.
@@ -91,41 +96,30 @@ class DETRArTrackingBase(nn.Module):
                     zero_mask = torch.ones(zero_samples.mask.shape, dtype=torch.bool, device=batch.device)
                     zero_samples = NestedTensor(zero_samples.tensors, zero_mask)
 
-                    out, *_ = super().forward(
-                        samples=zero_samples, targets=current_targets
-                    )
-                    output_deque[num_frames_lookback] = out
-
-                    if 'boxes' in current_targets[0]:
-                        current_targets_zero = [current_target.copy() for current_target in current_targets]
-                        for current_target in current_targets_zero:
-                            # Frame_1 Frame_zero_2 Frame_zero_3 Frame_zero_3
-                            current_target['number_of_consecutive_zero_frame'] = torch.tensor(
-                                num_frames_lookback, device=batch.device)
-
-                        result['pred_logits'].append(out['pred_logits'])
-                        result['pred_boxes'].append(out['pred_boxes'])
-                        targets_flat.extend(current_targets_zero)
-
-                if num_frames_lookback > 1 and 'boxes' in current_targets[0]:
-                    # Experiment to evaluate how well the model can predict an object's position after a time gap
-                    # where the input was either skipped or replaced with zero images due to missing data.
-                    out, *_ = super().forward(
-                        samples=batch, targets=current_targets
+                    out_blind, *_ = super().forward(
+                        samples=zero_samples, targets=current_targets_blind
                     )
 
-                    current_targets_with_input_after_gap = [current_target.copy() for current_target in current_targets]
-                    for current_target in current_targets_with_input_after_gap:
-                        assert 'number_of_consecutive_zero_frame' not in current_target
-                        # Frame_1 Frame_zero_2 Frame_zero_3 Frame_4
-                        current_target[
-                            'number_of_consecutive_gap_frame_followed_by_image'] = (
-                            torch.tensor(num_frames_lookback-1, device=batch.device))
+                    if has_ground_truth:
+                        self.populate_results(
+                            batch.device, current_targets_blind, out_blind, result, targets_flat, timestamp,
+                            'blind'
+                        )
 
-                    result['pred_logits'].append(out['pred_logits'])
-                    result['pred_boxes'].append(out['pred_boxes'])
-                    targets_flat.extend(current_targets_with_input_after_gap)
+                    # Experiment: gap
+                    if timestamp > 2 and has_ground_truth:
+                        # Experiment to evaluate how well the model can predict an object's position after a time gap
+                        # where the input was either skipped or replaced with zero images due to missing data.
+                        out_gap, *_ = super().forward(
+                            samples=batch, targets=current_targets_blind
+                        )
 
+                        self.populate_results(
+                            batch.device, current_targets_blind, out_gap, result, targets_flat, timestamp,
+                            'gap'
+                        )
+
+        # Prepare data for stacking
         min_size = min([logit.shape[1] for logit in result['pred_logits']])  # Minimum number of queries
 
         filtered_logits = []
@@ -172,6 +166,25 @@ class DETRArTrackingBase(nn.Module):
         result['pred_logits'] = torch.stack(filtered_logits, dim=0)
         result['pred_boxes'] = torch.stack(filtered_boxes, dim=0)
         return result, targets_flat
+
+    def populate_results(
+            self, device, current_targets, out_baseline, result, targets_flat, timestamp, experiment
+    ):
+        current_timestamp_targets = [current_target.copy() for current_target in current_targets]
+        self.populate_timestamp_and_experiment_information(device, current_timestamp_targets, timestamp, experiment)
+        result['pred_logits'].append(out_baseline['pred_logits'])
+        result['pred_boxes'].append(out_baseline['pred_boxes'])
+        targets_flat.extend(current_timestamp_targets)
+        return current_timestamp_targets
+
+    def populate_timestamp_and_experiment_information(self, device, current_timestamp_targets, timestamp, experiment):
+        for current_target in current_timestamp_targets:
+            current_target['timestamp'] = torch.tensor(timestamp, device=device)
+            current_target['experiment'] = experiment
+            if experiment == 'blind':
+                current_target['number_of_consecutive_zero_frame'] = torch.tensor(timestamp, device=device)
+            if experiment == 'gap':
+                current_target['number_of_consecutive_gap_frame_followed_by_image'] = torch.tensor(timestamp, device=device)
 
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
         current_targets = current_targets.copy()
