@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import sys
+from collections import defaultdict
 from typing import Iterable
 
 import torch
@@ -192,8 +193,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     is_deformable_detr_and_mot17 = args.deformable and args.dataset == 'mot'  # There's a potential colision with other MOT datasets
     coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
-    coco_evaluators_per_partition_key_and_partition_number_number = {}
-    prev_track_query_use_per_partition_key = {}
+    coco_evaluators_per_experiment_and_timestamp = {}
+    prev_track_query_use_per_experiment_and_timestamp = {}
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
@@ -247,57 +248,28 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                    'number_of_consecutive_gap_frame_followed_by_image' not in target
             }
 
-            coco_evaluator.update(results_for_no_dropped_frames)
+            coco_evaluator = None
+            # coco_evaluator.update(results_for_no_dropped_frames)
 
-            number_of_consecutive_zero_frame_key = 'number_of_consecutive_zero_frame'
-            number_of_consecutive_gap_frame_followed_by_image_key = 'number_of_consecutive_gap_frame_followed_by_image'
-
-            calculate_mean_prev_tracks_queries_used(
-                number_of_consecutive_zero_frame_key,
-                lambda t: number_of_consecutive_zero_frame_key in t,
-                prev_track_query_use_per_partition_key,
-                targets
-            )
-            calculate_mean_prev_tracks_queries_used(
-                number_of_consecutive_gap_frame_followed_by_image_key,
-                lambda t: number_of_consecutive_gap_frame_followed_by_image_key in t,
-                prev_track_query_use_per_partition_key,
-                targets
-            )
-            calculate_mean_prev_tracks_queries_used(
-                'default',
-                lambda t: number_of_consecutive_gap_frame_followed_by_image_key not in t and number_of_consecutive_zero_frame_key not in t,
-                prev_track_query_use_per_partition_key,
-                targets
-            )
+            prev_track_query_use_per_experiment_and_timestamp = (
+                calculate_mean_prev_tracks_queries_used_by_experiment_and_timestamp(targets))
 
             # Break evaluation by the number of dropped frames
-            results_orig_breakdown_by_consecutive_zero_frame = partition_by(
-                results_orig, targets, number_of_consecutive_zero_frame_key)
-
-            results_orig_breakdown_by_consecutive_gap_frame_followed_by_image = partition_by(
-                results_orig, targets, number_of_consecutive_gap_frame_followed_by_image_key)
-
-            partition_results = {
-                number_of_consecutive_zero_frame_key: results_orig_breakdown_by_consecutive_zero_frame,
-                number_of_consecutive_gap_frame_followed_by_image_key:
-                    results_orig_breakdown_by_consecutive_gap_frame_followed_by_image,
-            }
+            experiment_results = partition_by_experiment_and_timestamp(results_orig, targets)
 
             # Init coco evaluator
-            for partition_key, partition_results in partition_results.items():
-                # Ensure we have a dictionary for each partition_key in the main coco_evaluators dictionary
-                if partition_key not in coco_evaluators_per_partition_key_and_partition_number_number:
-                    coco_evaluators_per_partition_key_and_partition_number_number[partition_key] = {}
+            for experiment, experiment_results in experiment_results.items():
+                # Ensure we have a dictionary for each experiment in the main coco_evaluators dictionary
+                if experiment not in coco_evaluators_per_experiment_and_timestamp:
+                    coco_evaluators_per_experiment_and_timestamp[experiment] = {}
 
-                for skip_number, r in partition_results.items():
-                    if skip_number not in coco_evaluators_per_partition_key_and_partition_number_number[partition_key]:
-                        coco_evaluators_per_partition_key_and_partition_number_number[partition_key][
-                            skip_number] = CocoEvaluator(
+                for timestamp, r in experiment_results.items():
+                    if timestamp not in coco_evaluators_per_experiment_and_timestamp[experiment]:
+                        coco_evaluators_per_experiment_and_timestamp[experiment][timestamp] = CocoEvaluator(
                             base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17
                         )
 
-                    coco_evaluators_per_partition_key_and_partition_number_number[partition_key][skip_number].update(r)
+                    coco_evaluators_per_experiment_and_timestamp[experiment][timestamp].update(r)
 
         if panoptic_evaluator is not None:
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -317,10 +289,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     print("Averaged stats:", metric_logger)
     if coco_evaluator is not None:
         coco_evaluator.synchronize_between_processes()
-    if coco_evaluators_per_partition_key_and_partition_number_number:
-        for partition_key, evaluators in coco_evaluators_per_partition_key_and_partition_number_number.items():
-            print(f'Syncing {partition_key} {len(evaluators)} coco evaluators across processes...')
-            for skip_number, ce in evaluators.items():
+    if coco_evaluators_per_experiment_and_timestamp:
+        for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
+            print(f'Syncing experiment {experiment} {len(evaluators)} coco evaluators across processes...')
+            for timestamp, ce in evaluators.items():
                 ce.synchronize_between_processes()
     if panoptic_evaluator is not None:
         panoptic_evaluator.synchronize_between_processes()
@@ -329,10 +301,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     if coco_evaluator is not None:
         coco_evaluator.accumulate()
         coco_evaluator.summarize()
-    if coco_evaluators_per_partition_key_and_partition_number_number:
-        for partition_key, evaluators in coco_evaluators_per_partition_key_and_partition_number_number.items():
-            print(f'Accumulating breakdown results {partition_key} {len(evaluators)} coco evaluators')
-            for skip_number, ce in evaluators.items():
+    if coco_evaluators_per_experiment_and_timestamp:
+        for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
+            print(f'Accumulating results per experiment {experiment} {len(evaluators)} coco evaluators')
+            for timestamp, ce in evaluators.items():
                 ce.accumulate()
                 ce.summarize()
 
@@ -345,16 +317,15 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
         if 'segm' in coco_evaluator.coco_eval:
             stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
-    if coco_evaluators_per_partition_key_and_partition_number_number:
-        for partition_key, evaluators in coco_evaluators_per_partition_key_and_partition_number_number.items():
-            print(f'Store {partition_key} {len(evaluators)} coco evaluator breakdown results')
-            for skip_number, ce in evaluators.items():
-                stats[f'coco_eval_bbox_{partition_key}_{skip_number}'] = ce.coco_eval['bbox'].stats.tolist()
+    if coco_evaluators_per_experiment_and_timestamp:
+        for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
+            print(f'Store {experiment} {len(evaluators)} coco evaluator breakdown results')
+            for timestamp, ce in evaluators.items():
+                stats[f'coco_eval_bbox_{experiment}_{timestamp}'] = ce.coco_eval['bbox'].stats.tolist()
 
-    if prev_track_query_use_per_partition_key:
-        for partition_key, number_of_prev_track_query_used in prev_track_query_use_per_partition_key.items():
-            stats[f'prev_track_query_{partition_key}'] = (
-                torch.mean(torch.stack(number_of_prev_track_query_used).float())).item()
+    if prev_track_query_use_per_experiment_and_timestamp:
+        for (experiment, timestamp), mean_number_of_prev_track_query_used in prev_track_query_use_per_experiment_and_timestamp.items():
+            stats[f'prev_track_query_{experiment}_{timestamp}'] = mean_number_of_prev_track_query_used.item()
 
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
@@ -417,7 +388,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             eval_m = eval_summary[metric]['OVERALL']
             stats['track_bbox'].append(eval_m)
 
-    eval_stats = stats['coco_eval_bbox'][:3]
+    eval_stats = []
+    if 'coco_eval_bbox' in stats:
+        eval_stats = stats['coco_eval_bbox'][:3]
     if 'coco_eval_masks' in stats:
         eval_stats.extend(stats['coco_eval_masks'][:3])
     if 'track_bbox' in stats:
@@ -439,44 +412,48 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     return stats, eval_stats, coco_evaluator
 
 
-def calculate_mean_prev_tracks_queries_used(
-        partition_key, partition_predicate, result_dict, targets
-):
-    num_prev_track_queries_used_tensor = [
-        t['num_prev_track_queries_used']
-        for t in targets if partition_predicate(t) and 'num_prev_track_queries_used' in t]
+def calculate_mean_prev_tracks_queries_used_by_experiment_and_timestamp(targets):
+    breakdown_result_dict = defaultdict(lambda: defaultdict(list))
+    result_dict = {}
+    # Iterate through targets and filter by partition_predicate
+    for t in targets:
+        experiment = t.get('experiment')  # Extract the 'experiment' key
+        timestamp = t.get('timestamp')    # Extract the 'timestamp' key
+        num_prev_track_queries_used = t['num_prev_track_queries_used'] \
+            if 'num_prev_track_queries_used' in t else torch.tensor(0.0, dtype=torch.float32)
+        breakdown_result_dict[experiment][timestamp].append(num_prev_track_queries_used)
 
-    if len(num_prev_track_queries_used_tensor) == 0:
-        return
+    # Compute the mean for each (experiment, timestamp) partition
+    for experiment, timestamp_dict in breakdown_result_dict.items():
+        for timestamp, queries in timestamp_dict.items():
+            queries_tensor = torch.stack(queries).float()
+            mean_value = torch.mean(queries_tensor)
+            result_dict[(experiment, timestamp)] = mean_value
 
-    num_prev_track_queries_used_tensor_average = torch.mean(torch.stack(num_prev_track_queries_used_tensor).float())
-    if partition_key not in result_dict:
-        result_dict[partition_key] = []
-    result_dict[partition_key].append(
-        num_prev_track_queries_used_tensor_average
-    )
+    return result_dict
 
 
-def partition_by(results_orig, targets, partition_key):
+def partition_by_experiment_and_timestamp(results_orig, targets):
     result = {}
     for target, output in zip(targets, results_orig):
+        experiment = target['experiment']
 
-        if partition_key not in target:
-            continue
+        if experiment not in result:
+            result[experiment] = {}
 
-        partition_number = target[partition_key].item()
+        experiment_result_dict = result[experiment]
+        timestamp = target['timestamp'].item()
         image_id = target['image_id'].item()
 
-        if partition_number in result:
-
-            if image_id in result[partition_number]:
+        if timestamp in experiment_result_dict:
+            if image_id in experiment_result_dict[timestamp]:
                 print(
-                    f'Warn overriding results for partition key {partition_key} '
-                    f'number {partition_number} image id {image_id}'
+                    f'Warn overriding results for experiment {experiment} '
+                    f'timestamp {timestamp} image id {image_id}'
                 )
-            result[partition_number][image_id] = output
+            experiment_result_dict[timestamp][image_id] = output
         else:
-            result[partition_number] = {
+            experiment_result_dict[timestamp] = {
                 image_id: output
             }
     return result
