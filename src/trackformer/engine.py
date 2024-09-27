@@ -388,7 +388,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             eval_m = eval_summary[metric]['OVERALL']
             stats['track_bbox'].append(eval_m)
 
-    eval_stats = stats['coco_eval_bbox'][:3]
+    eval_stats = []
+    if 'coco_eval_bbox' in stats:
+        eval_stats = stats['coco_eval_bbox'][:3]
     if 'coco_eval_masks' in stats:
         eval_stats.extend(stats['coco_eval_masks'][:3])
     if 'track_bbox' in stats:
