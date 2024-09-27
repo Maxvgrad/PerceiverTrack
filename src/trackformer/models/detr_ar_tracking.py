@@ -1,5 +1,3 @@
-from collections import deque
-
 import torch
 import torch.nn as nn
 
@@ -33,20 +31,11 @@ class DETRArTrackingBase(nn.Module):
         src = src.permute(1, 0, 2, 3, 4)  # change dimension order from BT___ to TB___
 
         result = {'pred_logits': [], 'pred_boxes': []}
-        latents = None
-        max_num_of_frames_lookback = 0 if self.training else self._max_num_of_frames_lookback
-        # 0 index in deque is kept for current timestamp's output latents
-        # indecision from 1 to max_num_of_frames_lookback reserved for latents which was produced by dripping frame
-        # index is equal to how many times frame was dropped in a row
-        # e.g. if index is 3 then latent from timestamp-3 was fed into the model 3 times without frame input
-        output_deque = deque(maxlen=max_num_of_frames_lookback + 1)
         targets_flat = []
-        num_track_queries_reused_prev = []
         orig_size = torch.stack([t[-1]["orig_size"] for t in targets], dim=0).to(src.device)
 
         out_baseline = None
         out_blind = None
-        out_gap = None
 
         for timestamp, batch in enumerate(src):
             current_targets_base = [target_list[timestamp] for target_list in targets]
