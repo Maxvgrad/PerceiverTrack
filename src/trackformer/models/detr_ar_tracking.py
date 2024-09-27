@@ -70,7 +70,7 @@ class DETRArTrackingBase(nn.Module):
             if not self.training:
 
                 # Experiment: blind
-                if timestamp > 1:
+                if timestamp > 0:
                     current_targets_blind = current_targets_base
                     if out_blind:
                         hs_embeds, num_track_queries_reused = self.filter_hs_embeds(orig_size, out_blind)
@@ -96,7 +96,7 @@ class DETRArTrackingBase(nn.Module):
                         )
 
                     # Experiment: gap
-                    if timestamp > 2 and has_ground_truth:
+                    if timestamp > 1 and has_ground_truth:
                         # Experiment to evaluate how well the model can predict an object's position after a time gap
                         # where the input was either skipped or replaced with zero images due to missing data.
                         out_gap, *_ = super().forward(
