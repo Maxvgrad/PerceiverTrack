@@ -380,8 +380,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
             # mask_all_ones will be a [batch_size] tensor of True/False
             mask_all_ones = src_padding_mask.view(src_padding_mask.size(0), -1).all(dim=1)
 
-            # Expand the mask to the shape [batch_size, 1, 1, 1] to cover the channels, H, and W dimensions
-            mask_all_ones = mask_all_ones.view(-1, 1, 1, 1)
+            mask_all_ones = mask_all_ones.view(-1, 1, 1)
 
             # Zero out the corresponding rows in tgt2
             tgt2 = tgt2.masked_fill(mask_all_ones, float(0))
