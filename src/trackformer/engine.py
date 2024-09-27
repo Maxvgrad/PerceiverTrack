@@ -323,9 +323,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 stats[f'coco_eval_bbox_{experiment}_{timestamp}'] = ce.coco_eval['bbox'].stats.tolist()
 
     if prev_track_query_use_per_experiment_and_timestamp:
-        for (experiment, timestamp), number_of_prev_track_query_used in prev_track_query_use_per_experiment_and_timestamp.items():
-            stats[f'prev_track_query_{experiment}_{timestamp}'] = (
-                torch.mean(torch.stack(number_of_prev_track_query_used).float())).item()
+        for (experiment, timestamp), mean_number_of_prev_track_query_used in prev_track_query_use_per_experiment_and_timestamp.items():
+            stats[f'prev_track_query_{experiment}_{timestamp}'] = mean_number_of_prev_track_query_used.item()
 
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
