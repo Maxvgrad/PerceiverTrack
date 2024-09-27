@@ -248,7 +248,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                    'number_of_consecutive_gap_frame_followed_by_image' not in target
             }
 
-            coco_evaluator.update(results_for_no_dropped_frames)
+            coco_evaluator = None
+            # coco_evaluator.update(results_for_no_dropped_frames)
 
             prev_track_query_use_per_experiment_and_timestamp = (
                 calculate_mean_prev_tracks_queries_used_by_experiment_and_timestamp(targets))
