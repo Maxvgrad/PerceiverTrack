@@ -202,7 +202,7 @@ class DETRArTrackingBase(nn.Module):
                 # Pad `track_query_boxes` with float('nan') to match max_num_queries
                 if track_query_boxes.shape[0] < max_num_queries:
                     padding_size = max_num_queries - track_query_boxes.shape[0]
-                    nan_padding = torch.full((padding_size, track_query_boxes.shape[1]), float('nan'),
+                    nan_padding = torch.full((padding_size, track_query_boxes.shape[1]), float(0),
                                              dtype=track_query_boxes.dtype, device=track_query_boxes.device)
                     padded_track_query_boxes = torch.cat([track_query_boxes, nan_padding], dim=0)
                 else:
