@@ -176,13 +176,47 @@ class DETRArTrackingBase(nn.Module):
                 current_target['number_of_consecutive_gap_frame_followed_by_image'] = torch.tensor(timestamp, device=device)
 
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
+        # Copy the current targets
         current_targets = current_targets.copy()
+
+        # If there are embeddings present
         if len(hs_embeds) > 0:
+            # Get the maximum length of track queries across all targets (i.e., across all hs_embeds)
+            max_num_queries = max(hs_embed[0].shape[0] for hs_embed in hs_embeds)
+
+            # Iterate over each target and pad `track_query_hs_embeds` with 0s and `track_query_boxes` with float('nan')
             for i, current_target in enumerate(current_targets):
-                current_target['track_query_hs_embeds'] = hs_embeds[i][0]
-                current_target['track_query_boxes'] = hs_embeds[i][1]
-                current_target['num_prev_track_queries_used'] = torch.tensor(0.0, dtype=torch.float32) if len(num_track_queries_reused) == 0 \
+                track_query_hs_embed = hs_embeds[i][0]  # Embeddings
+                track_query_boxes = hs_embeds[i][1]  # Boxes
+
+                # Pad `track_query_hs_embeds` with zeros to match max_num_queries
+                if track_query_hs_embed.shape[0] < max_num_queries:
+                    padding_size = max_num_queries - track_query_hs_embed.shape[0]
+                    padded_hs_embed = torch.cat([track_query_hs_embed,
+                                                 torch.zeros((padding_size, track_query_hs_embed.shape[1]),
+                                                             dtype=track_query_hs_embed.dtype,
+                                                             device=track_query_hs_embed.device)], dim=0)
+                else:
+                    padded_hs_embed = track_query_hs_embed
+
+                # Pad `track_query_boxes` with float('nan') to match max_num_queries
+                if track_query_boxes.shape[0] < max_num_queries:
+                    padding_size = max_num_queries - track_query_boxes.shape[0]
+                    nan_padding = torch.full((padding_size, track_query_boxes.shape[1]), float(0),
+                                             dtype=track_query_boxes.dtype, device=track_query_boxes.device)
+                    padded_track_query_boxes = torch.cat([track_query_boxes, nan_padding], dim=0)
+                else:
+                    padded_track_query_boxes = track_query_boxes
+
+                # Add the padded values back to the target
+                current_target['track_query_hs_embeds'] = padded_hs_embed
+                current_target['track_query_boxes'] = padded_track_query_boxes
+
+                # Handle `num_prev_track_queries_used`
+                current_target['num_prev_track_queries_used'] = (
+                    torch.tensor(0.0, dtype=torch.float32) if len(num_track_queries_reused) == 0
                     else num_track_queries_reused[i]
+                )
 
         return current_targets
 
@@ -204,7 +238,6 @@ class DETRArTrackingBase(nn.Module):
             hs_embeds.append(
                 (out['hs_embed'][i][track_keep], post_process_result['boxes'][track_keep])
             )
-            num_track_queries_reused.append(num_track_queries_reused)
         return hs_embeds, num_track_queries_reused
 
 
