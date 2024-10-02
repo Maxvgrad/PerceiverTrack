@@ -238,7 +238,6 @@ class DETRArTrackingBase(nn.Module):
             hs_embeds.append(
                 (out['hs_embed'][i][track_keep], post_process_result['boxes'][track_keep])
             )
-            num_track_queries_reused.append(num_track_queries_reused)
         return hs_embeds, num_track_queries_reused
 
 
