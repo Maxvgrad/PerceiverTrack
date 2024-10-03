@@ -13,6 +13,7 @@ class DETRArTrackingBase(nn.Module):
                  track_obj_score_threshold: float = 0.4,
                  max_num_of_frames_lookback: int = 0,
                  feed_zero_frames_every_timestamp: bool = True,
+                 disable_propagate_track_query_experiment: bool = False,
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
@@ -20,6 +21,7 @@ class DETRArTrackingBase(nn.Module):
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
         self._feed_zero_frames_every_timestamp = feed_zero_frames_every_timestamp
+        self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()
@@ -47,6 +49,19 @@ class DETRArTrackingBase(nn.Module):
                 frame_keep_mask = frame_keep_mask.view(-1, 1, 1, 1)
                 batch = batch * frame_keep_mask
                 #TODO make NESTED tensor
+
+            if self._disable_propagate_track_query_experiment:
+                # Experiment: No track query propagation
+                out_no_track_query_prop, targets_resp, features, memory, hs = super().forward(
+                    samples=batch, targets=current_targets_base
+                )
+
+                if has_ground_truth:
+                    # If we have a ground truth for this timestamp
+                    self.populate_results(
+                        batch.device, current_targets_base, out_no_track_query_prop, result,
+                        targets_flat, timestamp, 'no_track_query_propagation'
+                    )
 
             current_targets_baseline = current_targets_base
             # Experiment: Baseline
