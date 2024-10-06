@@ -77,7 +77,6 @@ track_query_false_positive_prob: 0.1
 track_query_false_negative_prob: 0.4
 max_num_of_frames_lookback: 0
 # Dropout experiment
-feed_zero_frames_every_timestamp: True
 disable_propagate_track_query_experiment: False
 # only for vanilla DETR
 track_query_false_positive_eos_weight: true

@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from .deformable_detr import DeformableDETR
 from .detr import DETR
+from .perceiver_detection import PerceiverDetection
 from ..util.misc import NestedTensor, nested_tensor_from_tensor_list
 
 
@@ -12,7 +13,6 @@ class DETRArTrackingBase(nn.Module):
                  obj_detector_post,
                  track_obj_score_threshold: float = 0.4,
                  max_num_of_frames_lookback: int = 0,
-                 feed_zero_frames_every_timestamp: bool = True,
                  disable_propagate_track_query_experiment: bool = False,
                  **kwargs
                  ):
@@ -20,7 +20,6 @@ class DETRArTrackingBase(nn.Module):
         self._track_obj_score_threshold = track_obj_score_threshold
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
-        self._feed_zero_frames_every_timestamp = feed_zero_frames_every_timestamp
         self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
@@ -265,4 +264,9 @@ class DETRArTracking(DETRArTrackingBase, DETR):
 class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
     def __init__(self, tracking_kwargs, detr_kwargs):
         DeformableDETR.__init__(self, **detr_kwargs)
+        DETRArTrackingBase.__init__(self, **tracking_kwargs)
+
+class PerceiverArTracking(DETRArTrackingBase, PerceiverDetection):
+    def __init__(self, tracking_kwargs, perceiver_kwargs):
+        PerceiverDetection.__init__(self, **perceiver_kwargs)
         DETRArTrackingBase.__init__(self, **tracking_kwargs)
