@@ -46,10 +46,15 @@ class DETRArTrackingBase(nn.Module):
 
             if self.training:
                 frame_keep_mask = [t['keep_frame'] for t in current_targets_base]
-                frame_keep_mask = torch.tensor(frame_keep_mask, device=batch.device)
-                frame_keep_mask = frame_keep_mask.view(-1, 1, 1, 1)
-                batch = batch * frame_keep_mask
-                #TODO make NESTED tensor
+
+                batch = nested_tensor_from_tensor_list(batch)
+
+                for keep_frame, img, m in zip(frame_keep_mask, batch.tensors, batch.mask):
+                    if not keep_frame:  # If the frame should be dropped
+                        img[:, :, :] = 0  # Zero out the entire image
+                        m[:, :] = True  # Set the mask to True, marking the frame as dropped
+
+                batch = NestedTensor(batch.tensors, batch.mask)
 
             if self._disable_propagate_track_query_experiment:
                 # Experiment: No track query propagation
