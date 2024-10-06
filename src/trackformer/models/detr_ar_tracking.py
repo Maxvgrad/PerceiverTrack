@@ -33,9 +33,10 @@ class DETRArTrackingBase(nn.Module):
 
         src = src.permute(1, 0, 2, 3, 4)  # change dimension order from BT___ to TB___
 
+        device = src.device
         result = {'pred_logits': [], 'pred_boxes': []}
         targets_flat = []
-        orig_size = torch.stack([t[-1]["orig_size"] for t in targets], dim=0).to(src.device)
+        orig_size = torch.stack([t[-1]["orig_size"] for t in targets], dim=0).to(device)
 
         out_baseline = None
         out_blind = None
@@ -65,7 +66,7 @@ class DETRArTrackingBase(nn.Module):
                 if has_ground_truth:
                     # If we have a ground truth for this timestamp
                     self.populate_results(
-                        batch.device, current_targets_base, out_no_track_query_prop, result,
+                        device, current_targets_base, out_no_track_query_prop, result,
                         targets_flat, timestamp, 'no_track_query_propagation'
                     )
 
@@ -84,7 +85,7 @@ class DETRArTrackingBase(nn.Module):
             if has_ground_truth:
                 # If we have a ground truth for this timestamp
                 self.populate_results(
-                    batch.device, current_targets_baseline, out_baseline, result, targets_flat, timestamp, 'baseline'
+                    device, current_targets_baseline, out_baseline, result, targets_flat, timestamp, 'baseline'
                 )
 
             # Evaluation experiments
@@ -103,7 +104,7 @@ class DETRArTrackingBase(nn.Module):
                     # This allows us to evaluate how well the model can predict a new object position without actual input.
                     zero_batch = torch.zeros_like(batch)
                     zero_samples = nested_tensor_from_tensor_list(zero_batch)
-                    zero_mask = torch.ones(zero_samples.mask.shape, dtype=torch.bool, device=batch.device)
+                    zero_mask = torch.ones(zero_samples.mask.shape, dtype=torch.bool, device=device)
                     zero_samples = NestedTensor(zero_samples.tensors, zero_mask)
 
                     out_blind, *_ = super().forward(
@@ -112,7 +113,7 @@ class DETRArTrackingBase(nn.Module):
 
                     if has_ground_truth:
                         self.populate_results(
-                            batch.device, current_targets_blind, out_blind, result, targets_flat, timestamp,
+                            device, current_targets_blind, out_blind, result, targets_flat, timestamp,
                             'blind'
                         )
 
@@ -125,7 +126,7 @@ class DETRArTrackingBase(nn.Module):
                         )
 
                         self.populate_results(
-                            batch.device, current_targets_blind, out_gap, result, targets_flat, timestamp,
+                            device, current_targets_blind, out_gap, result, targets_flat, timestamp,
                             'gap'
                         )
 
