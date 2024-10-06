@@ -28,8 +28,27 @@ class PerceiverDetection(nn.Module):
         src, mask = features_nested_tensor.decompose()
         src = src.permute(0, 2, 3, 1)
         assert mask is not None
-        if latents is None and (targets and '_hs_embed' in targets[0]):
-            latents = torch.stack([target['_hs_embed'] for target in targets]).to(src.device)
+        if latents is None and (targets and 'track_query_hs_embeds' in targets[0]):
+            def pad(track_queries):
+                num_track_queries = track_queries.shape[0]
+                num_to_pad = self.num_queries - num_track_queries
+                # Ensure we only pad if num_to_pad is positive
+                if num_to_pad > 0:
+                    # Check that perceiver latents are large enough
+                    if num_to_pad > self.perceiver.latents.shape[0]:
+                        raise ValueError(
+                            f"Not enough latents to pad: Need {num_to_pad}, but only {self.perceiver.latents.shape[0]} available.")
+
+                    padding = self.perceiver.latents[-num_to_pad:].to(track_queries.device)
+                    return torch.cat([track_queries, padding])
+                elif num_to_pad < 0:
+                    # Handle the case where we have more queries than num_queries
+                    # We truncate the extra queries
+                    return track_queries[:self.num_queries]
+
+                return track_queries  # No padding needed if exactly the same size
+
+            latents = torch.stack([pad(target['track_query_hs_embeds']) for target in targets]).to(src.device)
 
         hs = self.perceiver(
             data=src,

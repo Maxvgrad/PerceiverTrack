@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import torch
 import torch.nn as nn
 
@@ -189,6 +191,42 @@ class DETRArTrackingBase(nn.Module):
             if experiment == 'gap':
                 current_target['number_of_consecutive_gap_frame_followed_by_image'] = torch.tensor(timestamp, device=device)
 
+    @abstractmethod
+    def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
+        pass
+
+    def filter_hs_embeds(self, orig_size, out):
+        post_process_results = self._obj_detector_post['bbox'](out, orig_size)
+        hs_embeds = []
+        num_track_queries_reused = []
+        for i, post_process_result in enumerate(post_process_results):
+            track_scores = post_process_result['scores']
+
+            track_keep = torch.logical_and(
+                track_scores > self._track_obj_score_threshold,
+                post_process_result['labels'][:] == 0
+            )
+
+            track_scored_prev = track_scores[:-self.num_queries]
+            num_track_scored_prev_true = torch.sum(track_scored_prev > 0)
+            num_track_queries_reused.append(num_track_scored_prev_true)
+            hs_embeds.append(
+                (out['hs_embed'][i][track_keep], post_process_result['boxes'][track_keep])
+            )
+        return hs_embeds, num_track_queries_reused
+
+
+class DETRArTracking(DETRArTrackingBase, DETR):
+    def __init__(self, tracking_kwargs, detr_kwargs):
+        DETR.__init__(self, **detr_kwargs)
+        DETRArTrackingBase.__init__(self, **tracking_kwargs)
+
+
+class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
+    def __init__(self, tracking_kwargs, detr_kwargs):
+        DeformableDETR.__init__(self, **detr_kwargs)
+        DETRArTrackingBase.__init__(self, **tracking_kwargs)
+
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
         # Copy the current targets
         current_targets = current_targets.copy()
@@ -234,39 +272,29 @@ class DETRArTrackingBase(nn.Module):
 
         return current_targets
 
-    def filter_hs_embeds(self, orig_size, out):
-        post_process_results = self._obj_detector_post['bbox'](out, orig_size)
-        hs_embeds = []
-        num_track_queries_reused = []
-        for i, post_process_result in enumerate(post_process_results):
-            track_scores = post_process_result['scores']
-
-            track_keep = torch.logical_and(
-                track_scores > self._track_obj_score_threshold,
-                post_process_result['labels'][:] == 0
-            )
-
-            track_scored_prev = track_scores[:-self.num_queries]
-            num_track_scored_prev_true = torch.sum(track_scored_prev > 0)
-            num_track_queries_reused.append(num_track_scored_prev_true)
-            hs_embeds.append(
-                (out['hs_embed'][i][track_keep], post_process_result['boxes'][track_keep])
-            )
-        return hs_embeds, num_track_queries_reused
-
-
-class DETRArTracking(DETRArTrackingBase, DETR):
-    def __init__(self, tracking_kwargs, detr_kwargs):
-        DETR.__init__(self, **detr_kwargs)
-        DETRArTrackingBase.__init__(self, **tracking_kwargs)
-
-
-class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
-    def __init__(self, tracking_kwargs, detr_kwargs):
-        DeformableDETR.__init__(self, **detr_kwargs)
-        DETRArTrackingBase.__init__(self, **tracking_kwargs)
-
 class PerceiverArTracking(DETRArTrackingBase, PerceiverDetection):
+
     def __init__(self, tracking_kwargs, perceiver_kwargs):
         PerceiverDetection.__init__(self, **perceiver_kwargs)
         DETRArTrackingBase.__init__(self, **tracking_kwargs)
+
+    def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
+        # Copy the current targets
+        current_targets = current_targets.copy()
+
+        # If there are embeddings present
+        if len(hs_embeds) > 0:
+            for i, current_target in enumerate(current_targets):
+                track_query_hs_embed = hs_embeds[i][0]  # Embeddings
+
+                # Add the padded values back to the target
+                current_target['track_query_hs_embeds'] = track_query_hs_embed
+                # current_target['track_query_boxes'] = track_query_boxes
+
+                # Handle `num_prev_track_queries_used`
+                current_target['num_prev_track_queries_used'] = (
+                    torch.tensor(0.0, dtype=torch.float32) if len(num_track_queries_reused) == 0
+                    else num_track_queries_reused[i]
+                )
+
+        return current_targets
