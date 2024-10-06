@@ -2,7 +2,7 @@ task: 'train'
 wandb_project: 'detr_track'
 wandb_id: null
 lr: 0.0002
-lr_backbone_names: ['backbone.0']
+lr_backbone_names: ['backbone.0', 'backbone']
 lr_backbone: 0.00002
 lr_linear_proj_names: ['reference_points', 'sampling_offsets']
 lr_linear_proj_mult: 0.1
