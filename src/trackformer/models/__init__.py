@@ -45,6 +45,8 @@ def build_model(args):
     elif args.dataset == 'nuimages':
         # num_classes = 10 # 9 + 1 (account for zero indexed array)
         num_classes = 20
+        if hasattr(args, 'model') and args.model == 'perceiver':
+            num_classes = 1
     else:
         raise NotImplementedError
 
