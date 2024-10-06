@@ -204,7 +204,7 @@ class DETRArTrackingBase(nn.Module):
 
             track_keep = torch.logical_and(
                 track_scores > self._track_obj_score_threshold,
-                post_process_result['labels'][:] == 0
+                post_process_result['labels'][:] == self._label_person
             )
 
             track_scored_prev = track_scores[:-self.num_queries]
@@ -226,6 +226,7 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
     def __init__(self, tracking_kwargs, detr_kwargs):
         DeformableDETR.__init__(self, **detr_kwargs)
         DETRArTrackingBase.__init__(self, **tracking_kwargs)
+        self._label_person = 0
 
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
         # Copy the current targets
@@ -277,6 +278,7 @@ class PerceiverArTracking(DETRArTrackingBase, PerceiverDetection):
     def __init__(self, tracking_kwargs, perceiver_kwargs):
         PerceiverDetection.__init__(self, **perceiver_kwargs)
         DETRArTrackingBase.__init__(self, **tracking_kwargs)
+        self._label_person = 1
 
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
         # Copy the current targets
