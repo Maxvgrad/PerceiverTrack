@@ -419,9 +419,9 @@ def calculate_mean_prev_tracks_queries_used_by_experiment_and_timestamp(targets)
     for t in targets:
         experiment = t.get('experiment')  # Extract the 'experiment' key
         timestamp = t.get('timestamp')    # Extract the 'timestamp' key
-        num_prev_track_queries_used = t['num_prev_track_queries_used'] \
-            if 'num_prev_track_queries_used' in t else torch.tensor(0.0, dtype=torch.float32)
-        breakdown_result_dict[experiment][timestamp].append(num_prev_track_queries_used)
+        num_track_queries_used = t['num_track_queries_used'] \
+            if 'num_track_queries_used' in t else torch.tensor(0.0, dtype=torch.float32)
+        breakdown_result_dict[experiment][timestamp].append(num_track_queries_used)
 
     # Compute the mean for each (experiment, timestamp) partition
     for experiment, timestamp_dict in breakdown_result_dict.items():
