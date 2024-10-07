@@ -284,7 +284,7 @@ class PerceiverArTracking(DETRArTrackingBase, PerceiverDetection):
     def __init__(self, tracking_kwargs, perceiver_kwargs):
         PerceiverDetection.__init__(self, **perceiver_kwargs)
         DETRArTrackingBase.__init__(self, **tracking_kwargs)
-        self._label_person = 1
+        self._label_person = 0
 
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds, num_track_queries_reused):
         # Copy the current targets
