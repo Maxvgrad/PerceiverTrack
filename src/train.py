@@ -283,11 +283,9 @@ def train(args: Namespace) -> None:
                     visualizers[k][k_inner].win = checkpoint['vis_win_names'][k][k_inner]
 
     if args.eval_only:
-        test_stats, val_stats, coco_evaluator = evaluate(
+        test_stats, val_stats = evaluate(
             model, criterion, postprocessors, data_loader_val, device,
             output_dir, visualizers['val'], args, 0)
-        if args.output_dir:
-            utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
 
         flattened_test_stats = create_flat_test_stats(test_stats)
 
@@ -325,7 +323,7 @@ def train(args: Namespace) -> None:
 
         # VAL
         if epoch == 1 or not epoch % args.val_interval:
-            test_stats, val_stats, _ = evaluate(
+            test_stats, val_stats = evaluate(
                 model, criterion, postprocessors, data_loader_val, device,
                 output_dir, visualizers['val'], args, epoch)
 

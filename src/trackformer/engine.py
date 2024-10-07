@@ -192,9 +192,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     iou_types = tuple(k for k in ('bbox', 'segm') if k in postprocessors.keys())
 
     is_deformable_detr_and_mot17 = args.dataset == 'mot'  # There's a potential collision with other MOT datasets
-    coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
     coco_evaluators_per_experiment_and_timestamp = {}
-    prev_track_query_use_per_experiment_and_timestamp = {}
+    track_query_use_per_experiment_and_timestamp = {}
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
@@ -237,39 +236,23 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         else:
             results_orig, _ = make_results(outputs, targets, postprocessors, args.tracking)
 
-        # TODO. remove cocoDts from coco eval and change example results output
-        if coco_evaluator is not None:
-            # Keep evaluation for 0 consecutive_frame_skip_number only for compatibility.
-            # It's redundant after we have a breakdown per skip number.
-            results_for_no_dropped_frames = {
-                target['image_id'].item(): output
-                for target, output in zip(targets, results_orig)
-                if 'number_of_consecutive_zero_frame' not in target and
-                   'number_of_consecutive_gap_frame_followed_by_image' not in target
-            }
+        track_query_use_per_experiment_and_timestamp = calculate_mean_tracks_queries_used_by_exp_and_ts(targets)
+        # Break evaluation by the number of dropped frames
+        experiment_results = partition_by_experiment_and_timestamp(results_orig, targets)
 
-            coco_evaluator = None
-            # coco_evaluator.update(results_for_no_dropped_frames)
+        # Init coco evaluator
+        for experiment, experiment_results in experiment_results.items():
+            # Ensure we have a dictionary for each experiment in the main coco_evaluators dictionary
+            if experiment not in coco_evaluators_per_experiment_and_timestamp:
+                coco_evaluators_per_experiment_and_timestamp[experiment] = {}
 
-            prev_track_query_use_per_experiment_and_timestamp = (
-                calculate_mean_prev_tracks_queries_used_by_experiment_and_timestamp(targets))
+            for timestamp, r in experiment_results.items():
+                if timestamp not in coco_evaluators_per_experiment_and_timestamp[experiment]:
+                    coco_evaluators_per_experiment_and_timestamp[experiment][timestamp] = CocoEvaluator(
+                        base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17
+                    )
 
-            # Break evaluation by the number of dropped frames
-            experiment_results = partition_by_experiment_and_timestamp(results_orig, targets)
-
-            # Init coco evaluator
-            for experiment, experiment_results in experiment_results.items():
-                # Ensure we have a dictionary for each experiment in the main coco_evaluators dictionary
-                if experiment not in coco_evaluators_per_experiment_and_timestamp:
-                    coco_evaluators_per_experiment_and_timestamp[experiment] = {}
-
-                for timestamp, r in experiment_results.items():
-                    if timestamp not in coco_evaluators_per_experiment_and_timestamp[experiment]:
-                        coco_evaluators_per_experiment_and_timestamp[experiment][timestamp] = CocoEvaluator(
-                            base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17
-                        )
-
-                    coco_evaluators_per_experiment_and_timestamp[experiment][timestamp].update(r)
+                coco_evaluators_per_experiment_and_timestamp[experiment][timestamp].update(r)
 
         if panoptic_evaluator is not None:
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -287,8 +270,6 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    if coco_evaluator is not None:
-        coco_evaluator.synchronize_between_processes()
     if coco_evaluators_per_experiment_and_timestamp:
         for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
             print(f'Syncing experiment {experiment} {len(evaluators)} coco evaluators across processes...')
@@ -298,9 +279,6 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         panoptic_evaluator.synchronize_between_processes()
 
     # accumulate predictions from all images
-    if coco_evaluator is not None:
-        coco_evaluator.accumulate()
-        coco_evaluator.summarize()
     if coco_evaluators_per_experiment_and_timestamp:
         for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
             print(f'Accumulating results per experiment {experiment} {len(evaluators)} coco evaluators')
@@ -312,20 +290,15 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     if panoptic_evaluator is not None:
         panoptic_res = panoptic_evaluator.summarize()
     stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
-    if coco_evaluator is not None:
-        if 'bbox' in coco_evaluator.coco_eval:
-            stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
-        if 'segm' in coco_evaluator.coco_eval:
-            stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
     if coco_evaluators_per_experiment_and_timestamp:
         for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
             print(f'Store {experiment} {len(evaluators)} coco evaluator breakdown results')
             for timestamp, ce in evaluators.items():
                 stats[f'coco_eval_bbox_{experiment}_{timestamp}'] = ce.coco_eval['bbox'].stats.tolist()
 
-    if prev_track_query_use_per_experiment_and_timestamp:
-        for (experiment, timestamp), mean_number_of_prev_track_query_used in prev_track_query_use_per_experiment_and_timestamp.items():
-            stats[f'prev_track_query_{experiment}_{timestamp}'] = mean_number_of_prev_track_query_used.item()
+    if track_query_use_per_experiment_and_timestamp:
+        for (experiment, timestamp), mean_number_of_prev_track_query_used in track_query_use_per_experiment_and_timestamp.items():
+            stats[f'track_query_{experiment}_{timestamp}'] = mean_number_of_prev_track_query_used.item()
 
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
@@ -409,10 +382,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         utils.destroy_distributed_mode(args)
         exit()
 
-    return stats, eval_stats, coco_evaluator
+    return stats, eval_stats
 
 
-def calculate_mean_prev_tracks_queries_used_by_experiment_and_timestamp(targets):
+def calculate_mean_tracks_queries_used_by_exp_and_ts(targets):
     breakdown_result_dict = defaultdict(lambda: defaultdict(list))
     result_dict = {}
     # Iterate through targets and filter by partition_predicate
