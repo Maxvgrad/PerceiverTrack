@@ -203,16 +203,9 @@ def train(args: Namespace) -> None:
                 elif 'class_embed' in k:
                     if args.model == 'perceiver':
                         indexes = [
-                            0,  # N/A
                             1,  # Person
                             91  # Background class (COCO has 90 classes)
                         ]
-                        if args.dataset == 'nuimages':
-                            indexes = [
-                                1,  # Person
-                                91  # Background class (COCO has 90 classes)
-                            ]
-
                         resume_value = checkpoint_value[indexes]
                     else:
                         # DEFAULT CODE SNIPPET FROM TABLEFORMER PAPER:

@@ -191,7 +191,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     base_ds = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = tuple(k for k in ('bbox', 'segm') if k in postprocessors.keys())
 
-    is_deformable_detr_and_mot17 = args.deformable and args.dataset == 'mot'  # There's a potential colision with other MOT datasets
+    is_deformable_detr_and_mot17 = args.dataset == 'mot'  # There's a potential collision with other MOT datasets
     coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17)
     coco_evaluators_per_experiment_and_timestamp = {}
     prev_track_query_use_per_experiment_and_timestamp = {}

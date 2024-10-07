@@ -41,7 +41,7 @@ def build_model(args):
             # IN COCO_CLASSES[:2] -> [N/A, Person]
             # We are only interested in 1 clas Person,
             # so N is 1, but according to DETR paper we add 1 (account for zero indexed array)
-            num_classes = 2
+            num_classes = 1 # Remove N/A instead we decrement the dataset class label
     elif args.dataset == 'nuimages':
         # num_classes = 10 # 9 + 1 (account for zero indexed array)
         num_classes = 20
