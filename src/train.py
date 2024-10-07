@@ -355,6 +355,8 @@ def train(args: Namespace) -> None:
                      'epoch': epoch,
                      'n_parameters': n_parameters}
 
+        print(json.dumps(log_stats, indent=2))
+
         wandb.log(log_stats, step=epoch)
 
         # MODEL SAVING
