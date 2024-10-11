@@ -204,7 +204,16 @@ class DETRArTrackingBase(nn.Module):
                 post_process_result['labels'][:] == self._label_person
             )
 
+            print(track_keep.shape)
             for key in output.keys():
+                print(key)
+                print(type(output[key]))
+                print(type(output[key][i]))
+                if isinstance(output[key][i], list):
+                    print(len(output[key][i]))
+                else:
+                    print(output[key][i].shape)
+
                 filtered_output[key].append(output[key][i][track_keep])
 
         return filtered_output
