@@ -31,6 +31,7 @@ from einops import rearrange, repeat
 from einops.layers.torch import Reduce
 from torch import nn, einsum
 
+
 # helpers
 
 def exists(val):
@@ -289,7 +290,20 @@ class Perceiver(nn.Module):
         # layers
 
         for cross_attn, cross_ff, self_attns in self.layers:
-            x = cross_attn(x, context=data, mask=mask) + x
+            x_cross = cross_attn(x, context=data, mask=mask)
+
+            if mask is not None:
+                # Check which rows (batch-wise) have all elements equal to 1 (fully masked)
+                # mask_all_ones will be a [batch_size] tensor of True/False
+                mask_all_ones = mask.view(mask.size(0), -1).all(dim=1)
+
+                mask_all_ones = mask_all_ones.view(-1, 1, 1)
+
+                # Zero out the corresponding rows in tgt2
+                x_cross = x_cross.masked_fill(mask_all_ones, float(0))
+
+            x = x_cross + x
+
             x = cross_ff(x) + x
 
             for self_attn, self_ff in self_attns:

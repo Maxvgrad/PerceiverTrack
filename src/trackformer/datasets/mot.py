@@ -161,7 +161,7 @@ def build_mot(image_set, args):
         prev_prev_frame=args.track_prev_prev_frame,
         sequence_frames=args.sequence_frames,
         frame_dropout_prob=args.frame_dropout_prob,
-        is_deformable_detr_and_mot17=(args.deformable and args.dataset == 'mot'),
+        is_deformable_detr_and_mot17=args.dataset == 'mot',
     )
 
     return dataset

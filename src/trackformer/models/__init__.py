@@ -7,7 +7,7 @@ from .backbone import build_backbone
 from .deformable_detr import DeformableDETR, DeformablePostProcess
 from .deformable_transformer import build_deforamble_transformer
 from .detr import DETR, PostProcess, SetCriterion
-from .detr_ar_tracking import DeformableDETRArTracking
+from .detr_ar_tracking import DeformableDETRArTracking, PerceiverArTracking
 from .detr_segmentation import (DeformableDETRSegm, DeformableDETRSegmTracking,
                                 DETRSegm, DETRSegmTracking,
                                 PostProcessPanoptic, PostProcessSegm)
@@ -41,10 +41,12 @@ def build_model(args):
             # IN COCO_CLASSES[:2] -> [N/A, Person]
             # We are only interested in 1 clas Person,
             # so N is 1, but according to DETR paper we add 1 (account for zero indexed array)
-            num_classes = 2
+            num_classes = 1 # Remove N/A instead we decrement the dataset class label
     elif args.dataset == 'nuimages':
         # num_classes = 10 # 9 + 1 (account for zero indexed array)
         num_classes = 20
+        if hasattr(args, 'model') and args.model == 'perceiver':
+            num_classes = 1
     else:
         raise NotImplementedError
 
@@ -62,7 +64,7 @@ def build_model(args):
             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
 
     if hasattr(args, 'model') and args.model == 'perceiver':
-        model = build_model_perceiver_based(args, matcher, num_classes)
+        model = build_model_perceiver_based(args, matcher, num_classes, postprocessors)
     else:
         model = build_model_detr_based(args, matcher, num_classes, postprocessors)
 
@@ -104,7 +106,7 @@ def build_model(args):
     return model, criterion, postprocessors
 
 
-def build_model_perceiver_based(args, matcher, num_classes):
+def build_model_perceiver_based(args, matcher, num_classes, obj_detector_post):
     backbone, perceiver, classifier_head = build_model_perceiver_detection(args, matcher, num_classes)
 
     tracking_kwargs = {
@@ -120,10 +122,14 @@ def build_model_perceiver_based(args, matcher, num_classes):
         'classification_head': classifier_head,
     }
 
-    model = PerceiverTracking(
-        max_num_of_frames_lookback=args.max_num_of_frames_lookback,
+    tracking_kwargs['track_obj_score_threshold'] = 0.4
+    tracking_kwargs['obj_detector_post'] = obj_detector_post
+    tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
+    tracking_kwargs['disable_propagate_track_query_experiment'] = args.disable_propagate_track_query_experiment
+
+    model = PerceiverArTracking(
         tracking_kwargs=tracking_kwargs,
-        detection_model_kwargs=detection_model_kwargs
+        perceiver_kwargs=detection_model_kwargs
     )
 
     return model
@@ -164,7 +170,6 @@ def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
                     tracking_kwargs['track_obj_score_threshold'] = 0.4
                     tracking_kwargs['obj_detector_post'] = obj_detector_post
                     tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
-                    tracking_kwargs['feed_zero_frames_every_timestamp'] = args.feed_zero_frames_every_timestamp
                     tracking_kwargs['disable_propagate_track_query_experiment'] = args.disable_propagate_track_query_experiment
 
                     model = DeformableDETRArTracking(tracking_kwargs, detr_kwargs)

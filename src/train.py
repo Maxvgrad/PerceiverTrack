@@ -202,11 +202,11 @@ def train(args: Namespace) -> None:
                     resume_value = checkpoint_value.repeat((2,) + (num_dims - 1) * (1, ))
                 elif 'class_embed' in k:
                     if args.model == 'perceiver':
-                        resume_value = checkpoint_value[[
-                            0,  # N/A
+                        indexes = [
                             1,  # Person
                             91  # Background class (COCO has 90 classes)
-                        ]]
+                        ]
+                        resume_value = checkpoint_value[indexes]
                     else:
                         # DEFAULT CODE SNIPPET FROM TABLEFORMER PAPER:
                         # person and no-object class
@@ -283,11 +283,9 @@ def train(args: Namespace) -> None:
                     visualizers[k][k_inner].win = checkpoint['vis_win_names'][k][k_inner]
 
     if args.eval_only:
-        test_stats, val_stats, coco_evaluator = evaluate(
+        test_stats, val_stats = evaluate(
             model, criterion, postprocessors, data_loader_val, device,
             output_dir, visualizers['val'], args, 0)
-        if args.output_dir:
-            utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
 
         flattened_test_stats = create_flat_test_stats(test_stats)
 
@@ -325,7 +323,7 @@ def train(args: Namespace) -> None:
 
         # VAL
         if epoch == 1 or not epoch % args.val_interval:
-            test_stats, val_stats, _ = evaluate(
+            test_stats, val_stats = evaluate(
                 model, criterion, postprocessors, data_loader_val, device,
                 output_dir, visualizers['val'], args, epoch)
 
@@ -356,6 +354,8 @@ def train(args: Namespace) -> None:
                      **{f'test_{k}': v for k, v in flattened_test_stats.items()},
                      'epoch': epoch,
                      'n_parameters': n_parameters}
+
+        print(json.dumps(log_stats, indent=2))
 
         wandb.log(log_stats, step=epoch)
 
