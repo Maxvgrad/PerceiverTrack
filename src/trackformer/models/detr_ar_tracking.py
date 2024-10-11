@@ -182,6 +182,11 @@ class DETRArTrackingBase(nn.Module):
         for current_target in current_timestamp_targets:
             current_target['timestamp'] = torch.tensor(timestamp, device=device)
             current_target['experiment'] = experiment
+        print(f'current_targets: {len(current_targets)}')
+        print(f'current_timestamp_targets: {len(current_timestamp_targets)}')
+        print(f'output["pred_logits"]: {len(output["pred_logits"])}')
+        print(f'output["pred_boxes"]: {len(output["pred_boxes"])}')
+
         assert len(current_timestamp_targets) == output['pred_logits'] == output['pred_boxes']
         result['pred_logits'].extend(output['pred_logits'])
         result['pred_boxes'].extend(output['pred_boxes'])
