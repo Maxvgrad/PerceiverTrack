@@ -194,7 +194,7 @@ class DETRArTrackingBase(nn.Module):
 
     def filter_output_result(self, orig_size, output):
         post_process_results = self._obj_detector_post['bbox'](output, orig_size)
-        filtered_output = {key: [] for key in output.keys()}
+        filtered_output = {key: [] for key in output.keys() if key != 'aux_outputs'}
 
         for i, post_process_result in enumerate(post_process_results):
             track_scores = post_process_result['scores']
@@ -204,17 +204,9 @@ class DETRArTrackingBase(nn.Module):
                 post_process_result['labels'][:] == self._label_person
             )
 
-            print(track_keep.shape)
             for key in output.keys():
-                print(key)
-                print(type(output[key]))
-                print(type(output[key][i]))
-                if isinstance(output[key][i], list):
-                    print(len(output[key][i]))
-                else:
-                    print(output[key][i].shape)
-
-                filtered_output[key].append(output[key][i][track_keep])
+                if key in filtered_output:
+                    filtered_output[key].append(output[key][i][track_keep])
 
         return filtered_output
 
