@@ -55,8 +55,6 @@ class DETRArTrackingBase(nn.Module):
                         img[:, :, :] = 0  # Zero out the entire image
                         m[:, :] = True  # Set the mask to True, marking the frame as dropped
 
-                batch = NestedTensor(batch.tensors, batch.mask)
-
             if self._disable_propagate_track_query_experiment:
                 # Experiment: No track query propagation
                 out_no_track_query_prop, targets_resp, features, memory, hs = super().forward(
@@ -130,56 +128,47 @@ class DETRArTrackingBase(nn.Module):
                             'gap'
                         )
 
-        # Prepare data for stacking
-        min_size = min([logit.shape[1] for logit in result['pred_logits']])  # Minimum number of queries
-
-        filtered_logits = []
-        filtered_boxes = []
-
-        for logits, boxes in zip(result['pred_logits'], result['pred_boxes']):  # Iteration over time
-            post_process_results = self._obj_detector_post['bbox'](
-                {'pred_boxes': boxes, 'pred_logits': logits},
-                orig_size
-            )
-
-            labels = torch.stack([post_process_result['labels'] for post_process_result in post_process_results]) # Corresponding labels
-            scores = torch.stack([post_process_result['scores'] for post_process_result in post_process_results])
-
-            remove_mask = (labels != 0) | (scores < self._track_obj_score_threshold)
-
-            for b in range(logits.shape[0]):  # Iterate over each batch
-
-                # Get the number of elements for the current batch
-                num_elements = logits[b].shape[0]
-                # Get the indices for the current batch
-                batch_remove_mask = remove_mask[b]
-                batch_remove_indices = torch.where(batch_remove_mask)[0]  # Indices where label != 0 for this batch
-
-                if num_elements > min_size:
-                    # Limit the number of indices to remove
-                    excess_elements_to_remove = batch_remove_indices[-(num_elements - min_size):]  # Keep only the excess
-
-                    batch_final_mask = torch.ones(num_elements, dtype=torch.bool,
-                                                  device=logits.device)  # Start with all True
-                    batch_final_mask[excess_elements_to_remove] = False  # Set False for excess elements with label != 0
-
-                    # Filter the logits and boxes based on the mask
-                    logits_filtered_batch = logits[b][batch_final_mask]
-                    boxes_filtered_batch = boxes[b][batch_final_mask]
-                else:
-                    # If no excess, retain all elements
-                    logits_filtered_batch = logits[b]
-                    boxes_filtered_batch = boxes[b]
-
-                filtered_logits.append(logits_filtered_batch)
-                filtered_boxes.append(boxes_filtered_batch)
-
-        result['pred_logits'] = torch.stack(filtered_logits, dim=0)
-        result['pred_boxes'] = torch.stack(filtered_boxes, dim=0)
+        result = self.pad_and_stack_results(result)
         return result, targets_flat
 
+    def pad_and_stack_results(self, result):
+        max_size = max([logit.shape[1] for logit in result['pred_logits']])  # Maximum number of queries
+
+        padded_logits = []
+        padded_boxes = []
+
+        for logits, boxes in zip(result['pred_logits'], result['pred_boxes']):
+            for b in range(logits.shape[0]):  # Iterate over each batch
+                # Get the number of elements (queries) for the current batch
+                num_elements = logits[b].shape[0]
+
+                # Pad if necessary to match max_size
+                if num_elements < max_size:
+                    # Pad logits and boxes to match max_size
+                    pad_size = max_size - num_elements
+                    padding_logits = torch.zeros((pad_size, logits[b].shape[1]), device=logits.device)
+                    padding_boxes = torch.zeros((pad_size, boxes[b].shape[1]), device=boxes.device)
+
+                    # Concatenate original logits/boxes with padding
+                    logits_padded_batch = torch.cat([logits[b], padding_logits], dim=0)
+                    boxes_padded_batch = torch.cat([boxes[b], padding_boxes], dim=0)
+                else:
+                    # If num_elements equals or exceeds max_size, truncate if needed (though unlikely)
+                    logits_padded_batch = logits[b][:max_size]
+                    boxes_padded_batch = boxes[b][:max_size]
+
+                # Append the padded tensors to the result lists
+                padded_logits.append(logits_padded_batch)
+                padded_boxes.append(boxes_padded_batch)
+
+        # Step 4: Stack the padded logits and boxes for all batches and time steps
+        result['pred_logits'] = torch.stack(padded_logits, dim=0)
+        result['pred_boxes'] = torch.stack(padded_boxes, dim=0)
+
+        return result
+
     def populate_results(
-            self, device, current_targets, out_baseline, result, targets_flat, timestamp, experiment
+            self, device, current_targets, output, result, targets_flat, timestamp, experiment
     ):
         current_timestamp_targets = [current_target.copy() for current_target in current_targets]
 
@@ -187,8 +176,8 @@ class DETRArTrackingBase(nn.Module):
             current_target['timestamp'] = torch.tensor(timestamp, device=device)
             current_target['experiment'] = experiment
 
-        result['pred_logits'].append(out_baseline['pred_logits'])
-        result['pred_boxes'].append(out_baseline['pred_boxes'])
+        result['pred_logits'].append(output['pred_logits'])
+        result['pred_boxes'].append(output['pred_boxes'])
         targets_flat.extend(current_timestamp_targets)
         return current_timestamp_targets
 
