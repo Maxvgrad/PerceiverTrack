@@ -146,7 +146,9 @@ class DETRArTrackingBase(nn.Module):
 
     def get_number_of_prev_track_queries(self, current_targets):
         return torch.tensor(
-            [t['num_track_queries_used'].item() if 'num_track_queries_used' in t else 0 for t in current_targets])
+            [t['num_track_queries_used'].item() if 'num_track_queries_used' in t else 0 for t in current_targets],
+            dtype=torch.int64
+        )
 
     def pad_and_stack_results(self, result):
         max_size = max([logit.shape[0] for logit in result['pred_logits']])  # Maximum number of queries
