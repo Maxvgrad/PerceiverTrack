@@ -227,7 +227,7 @@ class DETRArTrackingBase(nn.Module):
             previous_hs_embed = output['hs_embed'][i][:number_previous_track_queries][previous_track_keep]
             previous_track_scores = torch.zeros_like(previous_track_scores[previous_track_keep])
             previous_track_scores.fill_(float('inf'))
-            assert previous_track_scores.all(float('inf'))
+            assert torch.all(previous_track_scores == float('inf'))
 
             new_track_scores = post_process_result['scores'][number_previous_track_queries:]
             new_track_labels = post_process_result['labels'][number_previous_track_queries:]
