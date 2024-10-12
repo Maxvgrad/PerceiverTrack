@@ -146,7 +146,7 @@ class DETRArTrackingBase(nn.Module):
 
     def get_number_of_prev_track_queries(self, current_targets_baseline):
         return torch.tensor(
-            [t['num_track_queries_used'].shape[0] if 'num_track_queries_used' in t else 0 for t in
+            [t['num_track_queries_used'].item() if 'num_track_queries_used' in t else 0 for t in
              current_targets_baseline])
 
     def pad_and_stack_results(self, result):
@@ -262,7 +262,9 @@ class DETRArTrackingBase(nn.Module):
 
             keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
 
-            after_nms_count = keep.sum().item()
+            print(f'keep: {keep.shape}')
+
+            after_nms_count = keep.shape[0]
 
             # Print the number of filtered tracks after NMS
             print(f"Tracks after NMS: {after_nms_count} (-{previous_keep_count + new_keep_count - after_nms_count})")
