@@ -248,18 +248,24 @@ class DETRArTrackingBase(nn.Module):
             new_hs_embed = output['hs_embed'][i][number_previous_track_queries:][new_track_keep]
             new_track_scores = new_track_scores[new_track_keep]
 
+            print(f'previous_track_boxes: {previous_track_boxes.shape}')
+            print(f'new_track_boxes: {new_track_boxes.shape}')
+
             track_boxes = torch.cat([previous_track_boxes, new_track_boxes])
             logits = torch.cat([previous_track_pred_logits, new_track_pred_logits])
             hs_embeds = torch.cat([previous_hs_embed, new_hs_embed])
 
             track_scores = torch.cat([previous_track_scores, new_track_scores])
 
+            print(f'track_boxes: {track_boxes.shape}')
+            print(f'track_scores: {track_scores.shape}')
+
             keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
 
             after_nms_count = keep.sum().item()
 
             # Print the number of filtered tracks after NMS
-            print(f"Tracks before NMS: {after_nms_count} (-{previous_keep_count+new_keep_count-after_nms_count})")
+            print(f"Tracks after NMS: {after_nms_count} (-{previous_keep_count + new_keep_count - after_nms_count})")
 
             filtered_output['pred_boxes'].append(track_boxes[keep])
             filtered_output['pred_logits'].append(logits[keep])
