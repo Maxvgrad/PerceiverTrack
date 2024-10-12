@@ -222,9 +222,9 @@ class DETRArTrackingBase(nn.Module):
             previous_keep_count = previous_track_keep.sum().item()
             print(f'Previous track keep: {previous_keep_count} (-{number_previous_track_queries-previous_keep_count})')
 
-            previous_track_boxes = output[i]['pred_boxes'][:number_previous_track_queries][previous_track_keep]
-            previous_track_pred_logits = output[i]['pred_logits'][:number_previous_track_queries][previous_track_keep]
-            previous_hs_embed = output[i]['hs_embed'][:number_previous_track_queries][previous_track_keep]
+            previous_track_boxes = output['pred_boxes'][i][:number_previous_track_queries][previous_track_keep]
+            previous_track_pred_logits = output['pred_logits'][i][:number_previous_track_queries][previous_track_keep]
+            previous_hs_embed = output['hs_embed'][i][:number_previous_track_queries][previous_track_keep]
             previous_track_scores = torch.zeros_like(previous_track_scores[previous_track_keep])
             previous_track_scores.fill_(float('inf'))
             assert previous_track_scores.all(float('inf'))
@@ -243,9 +243,9 @@ class DETRArTrackingBase(nn.Module):
             new_keep_count = new_track_keep.sum().item()
             print(f'New track keep: {new_keep_count} (-{previous_keep_count+number_new_tracks-new_keep_count})')
 
-            new_track_boxes = output[i]['pred_boxes'][number_previous_track_queries:][new_track_keep]
-            new_track_pred_logits = output[i]['pred_logits'][number_previous_track_queries:][new_track_keep]
-            new_hs_embed = output[i]['hs_embed'][number_previous_track_queries:][new_track_keep]
+            new_track_boxes = output['pred_boxes'][i][number_previous_track_queries:][new_track_keep]
+            new_track_pred_logits = output['pred_logits'][i][number_previous_track_queries:][new_track_keep]
+            new_hs_embed = output['hs_embed'][i][number_previous_track_queries:][new_track_keep]
             new_track_scores = new_track_scores[new_track_keep]
 
             track_boxes = torch.cat([previous_track_boxes, new_track_boxes])
