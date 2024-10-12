@@ -144,10 +144,9 @@ class DETRArTrackingBase(nn.Module):
         result = self.pad_and_stack_results(result)
         return result, targets_flat
 
-    def get_number_of_prev_track_queries(self, current_targets_baseline):
+    def get_number_of_prev_track_queries(self, current_targets):
         return torch.tensor(
-            [t['num_track_queries_used'].item() if 'num_track_queries_used' in t else 0 for t in
-             current_targets_baseline])
+            [t['num_track_queries_used'].item() if 'num_track_queries_used' in t else 0 for t in current_targets])
 
     def pad_and_stack_results(self, result):
         max_size = max([logit.shape[0] for logit in result['pred_logits']])  # Maximum number of queries
@@ -206,7 +205,7 @@ class DETRArTrackingBase(nn.Module):
     def filter_output_result(self, orig_size, output, numbers_previous_track_queries):
         post_process_results = self._obj_detector_post['bbox'](output, orig_size)
         filtered_output = {key: [] for key in output.keys() if key != 'aux_outputs'}
-
+        print(f'numbers_previous_track_queries: {numbers_previous_track_queries}')
         for i, post_process_result in enumerate(post_process_results):
             number_previous_track_queries = numbers_previous_track_queries[i]
             previous_track_scores = post_process_result['scores'][:number_previous_track_queries]
