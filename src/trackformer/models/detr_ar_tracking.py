@@ -24,7 +24,7 @@ class DETRArTrackingBase(nn.Module):
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
         self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
-        self.detection_nms_thresh = 0.9
+        self.detection_nms_thresh = 0.5
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()
