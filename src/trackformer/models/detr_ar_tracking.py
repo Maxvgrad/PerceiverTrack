@@ -195,7 +195,7 @@ class DETRArTrackingBase(nn.Module):
             current_target['timestamp'] = torch.tensor(timestamp, device=device)
             current_target['experiment'] = experiment
             current_target['custom_numeric_metric_nms_delta'] = output['nms_deltas'][i]
-            current_target['custom_numeric_metric_num_gt_boxes'] = current_target["boxes"].shape[0]
+            current_target['custom_numeric_metric_num_gt_boxes'] = torch.tensor(current_target["boxes"].shape[0], dtype=torch.float32)
         assert len(current_timestamp_targets) == len(output['pred_logits']) == len(output['pred_boxes'])
         result['pred_logits'].extend(output['pred_logits'])
         result['pred_boxes'].extend(output['pred_boxes'])
@@ -261,7 +261,9 @@ class DETRArTrackingBase(nn.Module):
 
             after_nms_count = keep.shape[0]
 
-            filtered_output['nms_deltas'].append((previous_keep_count + new_keep_count) - after_nms_count)
+            filtered_output['nms_deltas'].append(
+                torch.tensor((previous_keep_count + new_keep_count) - after_nms_count, dtype=torch.float32)
+            )
 
             filtered_output['pred_boxes'].append(raw_out_track_boxes[keep])
             filtered_output['pred_logits'].append(logits[keep])
