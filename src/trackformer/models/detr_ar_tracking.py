@@ -194,7 +194,7 @@ class DETRArTrackingBase(nn.Module):
         for i, current_target in enumerate(current_timestamp_targets):
             current_target['timestamp'] = torch.tensor(timestamp, device=device)
             current_target['experiment'] = experiment
-            current_target['custom_numeric_metric_nms_delta'] = result['nms_cut'][i]
+            current_target['custom_numeric_metric_nms_delta'] = result['nms_deltas'][i]
             current_target['custom_numeric_metric_num_gt_boxes'] = current_target["boxes"].shape[0]
         assert len(current_timestamp_targets) == len(output['pred_logits']) == len(output['pred_boxes'])
         result['pred_logits'].extend(output['pred_logits'])
@@ -209,15 +209,12 @@ class DETRArTrackingBase(nn.Module):
     def filter_output_result(self, orig_size, output, numbers_previous_track_queries):
         post_process_results = self._obj_detector_post['bbox'](output, orig_size)
         filtered_output = {key: [] for key in output.keys() if key != 'aux_outputs'}
-        filtered_output['nms_cut'] = []
-        print(f'numbers_previous_track_queries: {numbers_previous_track_queries}')
+        filtered_output['nms_deltas'] = []
         for i, post_process_result in enumerate(post_process_results):
             number_previous_track_queries = numbers_previous_track_queries[i]
             previous_track_scores = post_process_result['scores'][:number_previous_track_queries]
             previous_track_labels = post_process_result['labels'][:number_previous_track_queries]
             previous_boxes = post_process_result['boxes'][:number_previous_track_queries]
-
-            print(f'Previous tracks: {number_previous_track_queries}')
 
             previous_track_keep = torch.logical_and(
                 previous_track_scores > self._track_obj_score_threshold,
@@ -225,7 +222,6 @@ class DETRArTrackingBase(nn.Module):
             )
 
             previous_keep_count = previous_track_keep.sum().item()
-            print(f'Previous track keep: {previous_keep_count} (-{number_previous_track_queries-previous_keep_count})')
 
             previous_track_boxes = output['pred_boxes'][i][:number_previous_track_queries][previous_track_keep]
             previous_track_pred_logits = output['pred_logits'][i][:number_previous_track_queries][previous_track_keep]
@@ -240,7 +236,6 @@ class DETRArTrackingBase(nn.Module):
             new_track_labels = post_process_result['labels'][-self.num_queries:]
 
             number_new_tracks = new_track_scores.shape[0]
-            print(f'New tracks: {number_new_tracks}')
 
             new_track_keep = torch.logical_and(
                 new_track_scores > self._track_obj_score_threshold,
@@ -248,7 +243,6 @@ class DETRArTrackingBase(nn.Module):
             )
 
             new_keep_count = new_track_keep.sum().item()
-            print(f'New track keep: {new_keep_count} (-{number_new_tracks-new_keep_count})')
 
             new_track_boxes = output['pred_boxes'][i][-self.num_queries:][new_track_keep]
             new_track_pred_logits = output['pred_logits'][i][-self.num_queries:][new_track_keep]
@@ -256,30 +250,20 @@ class DETRArTrackingBase(nn.Module):
             new_track_scores = new_track_scores[new_track_keep]
             new_boxes = new_boxes[new_track_keep]
 
-            print(f'previous_track_boxes: {previous_track_boxes.shape}')
-            print(f'new_track_boxes: {new_track_boxes.shape}')
-
+            raw_out_track_boxes = torch.cat([previous_track_boxes, new_track_boxes])
             track_boxes = torch.cat([previous_boxes, new_boxes])
             logits = torch.cat([previous_track_pred_logits, new_track_pred_logits])
             hs_embeds = torch.cat([previous_hs_embed, new_hs_embed])
 
             track_scores = torch.cat([previous_track_scores, new_track_scores])
 
-            print(f'track_boxes: {track_boxes.shape}')
-            print(f'track_scores: {track_scores.shape}')
-
             keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
-
-            print(f'keep: {keep.shape}')
 
             after_nms_count = keep.shape[0]
 
-            filtered_output['nms_cut'].append((previous_keep_count + new_keep_count) - after_nms_count)
+            filtered_output['nms_deltas'].append((previous_keep_count + new_keep_count) - after_nms_count)
 
-            # Print the number of filtered tracks after NMS
-            print(f"Tracks after NMS: {after_nms_count}")
-
-            filtered_output['pred_boxes'].append(track_boxes[keep])
+            filtered_output['pred_boxes'].append(raw_out_track_boxes[keep])
             filtered_output['pred_logits'].append(logits[keep])
             filtered_output['hs_embed'].append(hs_embeds[keep])
 
