@@ -2,6 +2,7 @@ from abc import abstractmethod
 
 import torch
 import torch.nn as nn
+from torchvision.ops import nms
 
 from .deformable_detr import DeformableDETR
 from .detr import DETR
@@ -23,6 +24,7 @@ class DETRArTrackingBase(nn.Module):
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
         self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
+        self.detection_nms_thresh = 0.9
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()
@@ -192,21 +194,51 @@ class DETRArTrackingBase(nn.Module):
     def populate_targets_with_query_hs_and_reference_boxes(self, current_targets, hs_embeds):
         pass
 
-    def filter_output_result(self, orig_size, output):
+    def filter_output_result(self, orig_size, output, numbers_previous_track_queries):
         post_process_results = self._obj_detector_post['bbox'](output, orig_size)
         filtered_output = {key: [] for key in output.keys() if key != 'aux_outputs'}
 
         for i, post_process_result in enumerate(post_process_results):
-            track_scores = post_process_result['scores']
+            number_previous_track_queries = numbers_previous_track_queries[i]
+            previous_track_scores = post_process_result['scores'][:number_previous_track_queries]
+            previous_track_labels = post_process_result['labels'][:number_previous_track_queries]
 
-            track_keep = torch.logical_and(
-                track_scores > self._track_obj_score_threshold,
-                post_process_result['labels'][:] == self._label_person
+            previous_track_keep = torch.logical_and(
+                previous_track_scores > self._track_obj_score_threshold,
+                previous_track_labels == self._label_person
             )
 
-            for key in output.keys():
-                if key in filtered_output:
-                    filtered_output[key].append(output[key][i][track_keep])
+            previous_track_boxes = output[i]['pred_boxes'][:number_previous_track_queries][previous_track_keep]
+            previous_track_pred_logits = output[i]['pred_logits'][:number_previous_track_queries][previous_track_keep]
+            previous_hs_embed = output[i]['hs_embed'][:number_previous_track_queries][previous_track_keep]
+            previous_track_scores = torch.zeros_like(previous_track_scores[previous_track_keep])
+            previous_track_scores.fill_(float('inf'))
+            assert previous_track_scores.all(float('inf'))
+
+            new_track_scores = post_process_result['scores'][number_previous_track_queries:]
+            new_track_labels = post_process_result['labels'][number_previous_track_queries:]
+
+            new_track_keep = torch.logical_and(
+                new_track_scores > self._track_obj_score_threshold,
+                new_track_labels == self._label_person
+            )
+
+            new_track_boxes = output[i]['pred_boxes'][number_previous_track_queries:][new_track_keep]
+            new_track_pred_logits = output[i]['pred_logits'][number_previous_track_queries:][new_track_keep]
+            new_hs_embed = output[i]['hs_embed'][number_previous_track_queries:][new_track_keep]
+            new_track_scores = new_track_scores[new_track_keep]
+
+            track_boxes = torch.cat([previous_track_boxes, new_track_boxes])
+            logits = torch.cat([previous_track_pred_logits, new_track_pred_logits])
+            hs_embeds = torch.cat([previous_hs_embed, new_hs_embed])
+
+            track_scores = torch.cat([previous_track_scores, new_track_scores])
+
+            keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
+
+            filtered_output['pred_boxes'].append(track_boxes[keep])
+            filtered_output['pred_logits'].append(logits[keep])
+            filtered_output['hs_embed'].append(hs_embeds[keep])
 
         return filtered_output
 
