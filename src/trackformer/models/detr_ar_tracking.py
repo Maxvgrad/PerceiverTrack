@@ -24,7 +24,7 @@ class DETRArTrackingBase(nn.Module):
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
         self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
-        self.detection_nms_thresh = 0.5
+        self.detection_nms_thresh = 0.9
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()
@@ -146,7 +146,7 @@ class DETRArTrackingBase(nn.Module):
 
     def get_number_of_prev_track_queries(self, current_targets):
         return torch.tensor(
-            [t['num_track_queries_used'].item() if 'num_track_queries_used' in t else 0 for t in current_targets],
+            [t['custom_numeric_metric_num_track_queries_used'].item() if 'custom_numeric_metric_num_track_queries_used' in t else 0 for t in current_targets],
             dtype=torch.int64
         )
 
@@ -191,9 +191,11 @@ class DETRArTrackingBase(nn.Module):
     ):
         current_timestamp_targets = [current_target.copy() for current_target in current_targets]
 
-        for current_target in current_timestamp_targets:
+        for i, current_target in enumerate(current_timestamp_targets):
             current_target['timestamp'] = torch.tensor(timestamp, device=device)
             current_target['experiment'] = experiment
+            current_target['custom_numeric_metric_nms_delta'] = result['nms_cut'][i]
+            current_target['custom_numeric_metric_num_gt_boxes'] = current_target["boxes"].shape[0]
         assert len(current_timestamp_targets) == len(output['pred_logits']) == len(output['pred_boxes'])
         result['pred_logits'].extend(output['pred_logits'])
         result['pred_boxes'].extend(output['pred_boxes'])
@@ -207,6 +209,7 @@ class DETRArTrackingBase(nn.Module):
     def filter_output_result(self, orig_size, output, numbers_previous_track_queries):
         post_process_results = self._obj_detector_post['bbox'](output, orig_size)
         filtered_output = {key: [] for key in output.keys() if key != 'aux_outputs'}
+        filtered_output['nms_cut'] = []
         print(f'numbers_previous_track_queries: {numbers_previous_track_queries}')
         for i, post_process_result in enumerate(post_process_results):
             number_previous_track_queries = numbers_previous_track_queries[i]
@@ -271,8 +274,10 @@ class DETRArTrackingBase(nn.Module):
 
             after_nms_count = keep.shape[0]
 
+            filtered_output['nms_cut'].append((previous_keep_count + new_keep_count) - after_nms_count)
+
             # Print the number of filtered tracks after NMS
-            print(f"Tracks after NMS: {after_nms_count} (-{previous_keep_count + new_keep_count - after_nms_count})")
+            print(f"Tracks after NMS: {after_nms_count}")
 
             filtered_output['pred_boxes'].append(track_boxes[keep])
             filtered_output['pred_logits'].append(logits[keep])
@@ -311,7 +316,7 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
                 track_query_boxes = pred_boxes[i]  # Boxes
 
                 num_track_queries_used = track_query_hs_embed.shape[0]
-                current_target['num_track_queries_used'] = torch.tensor(num_track_queries_used, dtype=torch.float32)
+                current_target['custom_numeric_metric_num_track_queries_used'] = torch.tensor(num_track_queries_used, dtype=torch.float32)
                 # Pad `track_query_hs_embeds` with zeros to match max_num_queries
                 if track_query_hs_embed.shape[0] < max_num_queries:
                     padding_size = max_num_queries - track_query_hs_embed.shape[0]
@@ -336,7 +341,7 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
                 current_target['track_query_boxes'] = padded_track_query_boxes
         else:
             for i, current_target in enumerate(current_targets):
-                current_target['num_track_queries_used'] = torch.tensor(0.0, dtype=torch.float32)
+                current_target['custom_numeric_metric_num_track_queries_used'] = torch.tensor(0.0, dtype=torch.float32)
 
         return current_targets
 
@@ -362,9 +367,9 @@ class PerceiverArTracking(DETRArTrackingBase, PerceiverDetection):
                 current_target['track_query_hs_embeds'] = track_query_hs_embed
                 num_track_queries_used = track_query_hs_embed.shape[0]
 
-                current_target['num_track_queries_used'] = torch.tensor(num_track_queries_used, dtype=torch.float32)
+                current_target['custom_numeric_metric_num_track_queries_used'] = torch.tensor(num_track_queries_used, dtype=torch.float32)
         else:
             for i, current_target in enumerate(current_targets):
-                current_target['num_track_queries_used'] = torch.tensor(0.0, dtype=torch.float32)
+                current_target['custom_numeric_metric_num_track_queries_used'] = torch.tensor(0.0, dtype=torch.float32)
 
         return current_targets
