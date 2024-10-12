@@ -241,7 +241,7 @@ class DETRArTrackingBase(nn.Module):
             )
 
             new_keep_count = new_track_keep.sum().item()
-            print(f'New track keep: {new_keep_count} (-{previous_keep_count+number_new_tracks-new_keep_count})')
+            print(f'New track keep: {new_keep_count} (-{number_new_tracks-new_keep_count})')
 
             new_track_boxes = output['pred_boxes'][i][number_previous_track_queries:][new_track_keep]
             new_track_pred_logits = output['pred_logits'][i][number_previous_track_queries:][new_track_keep]
@@ -259,7 +259,7 @@ class DETRArTrackingBase(nn.Module):
             after_nms_count = keep.sum().item()
 
             # Print the number of filtered tracks after NMS
-            print(f"Tracks before NMS: {after_nms_count} (-{new_keep_count-after_nms_count})")
+            print(f"Tracks before NMS: {after_nms_count} (-{previous_keep_count+new_keep_count-after_nms_count})")
 
             filtered_output['pred_boxes'].append(track_boxes[keep])
             filtered_output['pred_logits'].append(logits[keep])
