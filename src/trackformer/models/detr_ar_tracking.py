@@ -212,6 +212,7 @@ class DETRArTrackingBase(nn.Module):
             number_previous_track_queries = numbers_previous_track_queries[i]
             previous_track_scores = post_process_result['scores'][:number_previous_track_queries]
             previous_track_labels = post_process_result['labels'][:number_previous_track_queries]
+            previous_boxes = post_process_result['boxes'][:number_previous_track_queries]
 
             print(f'Previous tracks: {number_previous_track_queries}')
 
@@ -229,8 +230,10 @@ class DETRArTrackingBase(nn.Module):
             previous_track_scores = torch.zeros_like(previous_track_scores[previous_track_keep])
             previous_track_scores.fill_(float('inf'))
             assert torch.all(previous_track_scores == float('inf'))
+            previous_boxes = previous_boxes[previous_track_keep]
 
             new_track_scores = post_process_result['scores'][-self.num_queries:]
+            new_boxes = post_process_result['boxes'][-self.num_queries:]
             new_track_labels = post_process_result['labels'][-self.num_queries:]
 
             number_new_tracks = new_track_scores.shape[0]
@@ -248,11 +251,12 @@ class DETRArTrackingBase(nn.Module):
             new_track_pred_logits = output['pred_logits'][i][-self.num_queries:][new_track_keep]
             new_hs_embed = output['hs_embed'][i][-self.num_queries:][new_track_keep]
             new_track_scores = new_track_scores[new_track_keep]
+            new_boxes = new_boxes[new_track_keep]
 
             print(f'previous_track_boxes: {previous_track_boxes.shape}')
             print(f'new_track_boxes: {new_track_boxes.shape}')
 
-            track_boxes = torch.cat([previous_track_boxes, new_track_boxes])
+            track_boxes = torch.cat([previous_boxes, new_boxes])
             logits = torch.cat([previous_track_pred_logits, new_track_pred_logits])
             hs_embeds = torch.cat([previous_hs_embed, new_hs_embed])
 
