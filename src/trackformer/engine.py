@@ -297,10 +297,6 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 stats[f'coco_eval_bbox_{experiment}_{timestamp}'] = ce.coco_eval['bbox'].stats.tolist()
 
     if track_query_use_per_experiment_and_timestamp:
-        for (experiment, timestamp), mean_number_of_prev_track_query_used in track_query_use_per_experiment_and_timestamp.items():
-            stats[f'track_query_{experiment}_{timestamp}'] = mean_number_of_prev_track_query_used.item()
-
-    if track_query_use_per_experiment_and_timestamp:
         for metric, experiment_timestamp_dict in track_query_use_per_experiment_and_timestamp.items():
             for (experiment, timestamp), mean_value in experiment_timestamp_dict.items():
                 stats[f'{metric.replace("custom_numeric_metric_", "")}_{experiment}_{timestamp}'] = mean_value.item()
