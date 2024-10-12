@@ -63,7 +63,8 @@ class DETRArTrackingBase(nn.Module):
                     samples=batch, targets=current_targets_base
                 )
 
-                out_no_track_query_prop = self.filter_output_result(orig_size, out_no_track_query_prop)
+                out_no_track_query_prop = self.filter_output_result(
+                    orig_size, out_no_track_query_prop, self.get_number_of_prev_track_queries(current_targets_base))
 
                 if has_ground_truth:
                     # If we have a ground truth for this timestamp
@@ -83,7 +84,8 @@ class DETRArTrackingBase(nn.Module):
                 samples=batch, targets=current_targets_baseline
             )
 
-            out_baseline = self.filter_output_result(orig_size, out_baseline)
+            out_baseline = self.filter_output_result(
+                orig_size, out_baseline, self.get_number_of_prev_track_queries(current_targets_baseline))
 
             if has_ground_truth:
                 # If we have a ground truth for this timestamp
@@ -114,7 +116,8 @@ class DETRArTrackingBase(nn.Module):
                         samples=zero_samples, targets=current_targets_blind
                     )
 
-                    out_blind = self.filter_output_result(orig_size, out_blind)
+                    out_blind = self.filter_output_result(
+                        orig_size, out_blind, self.get_number_of_prev_track_queries(current_targets_blind))
 
                     if has_ground_truth:
                         self.populate_results(
@@ -130,7 +133,8 @@ class DETRArTrackingBase(nn.Module):
                             samples=batch, targets=current_targets_blind
                         )
 
-                        out_gap = self.filter_output_result(orig_size, out_gap)
+                        out_gap = self.filter_output_result(
+                            orig_size, out_gap, self.get_number_of_prev_track_queries(current_targets_blind))
 
                         self.populate_results(
                             device, current_targets_blind, out_gap, result, targets_flat, timestamp,
@@ -139,6 +143,11 @@ class DETRArTrackingBase(nn.Module):
 
         result = self.pad_and_stack_results(result)
         return result, targets_flat
+
+    def get_number_of_prev_track_queries(self, current_targets_baseline):
+        return torch.tensor(
+            [t['num_track_queries_used'].shape[0] if 'num_track_queries_used' in t else 0 for t in
+             current_targets_baseline])
 
     def pad_and_stack_results(self, result):
         max_size = max([logit.shape[0] for logit in result['pred_logits']])  # Maximum number of queries
