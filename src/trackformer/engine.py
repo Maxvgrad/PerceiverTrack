@@ -297,8 +297,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 stats[f'coco_eval_bbox_{experiment}_{timestamp}'] = ce.coco_eval['bbox'].stats.tolist()
 
     if track_query_use_per_experiment_and_timestamp:
-        for (experiment, timestamp), mean_number_of_prev_track_query_used in track_query_use_per_experiment_and_timestamp.items():
-            stats[f'track_query_{experiment}_{timestamp}'] = mean_number_of_prev_track_query_used.item()
+        for metric, experiment_timestamp_dict in track_query_use_per_experiment_and_timestamp.items():
+            for (experiment, timestamp), mean_value in experiment_timestamp_dict.items():
+                stats[f'{metric.replace("custom_numeric_metric_", "")}_{experiment}_{timestamp}'] = mean_value.item()
 
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
@@ -386,22 +387,28 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
 
 def calculate_mean_tracks_queries_used_by_exp_and_ts(targets):
-    breakdown_result_dict = defaultdict(lambda: defaultdict(list))
-    result_dict = {}
-    # Iterate through targets and filter by partition_predicate
+    breakdown_result_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+
+    # Iterate through targets and group by experiment and timestamp for each custom metric
     for t in targets:
         experiment = t.get('experiment')  # Extract the 'experiment' key
         timestamp = t.get('timestamp')    # Extract the 'timestamp' key
-        num_track_queries_used = t['num_track_queries_used'] \
-            if 'num_track_queries_used' in t else torch.tensor(0.0, dtype=torch.float32)
-        breakdown_result_dict[experiment][timestamp].append(num_track_queries_used)
 
-    # Compute the mean for each (experiment, timestamp) partition
-    for experiment, timestamp_dict in breakdown_result_dict.items():
-        for timestamp, queries in timestamp_dict.items():
-            queries_tensor = torch.stack(queries).float()
-            mean_value = torch.mean(queries_tensor)
-            result_dict[(experiment, timestamp)] = mean_value
+        for key, value in t.items():
+            if key.startswith("custom_numeric_metric_"):
+                metric_value = value if value is not None else torch.tensor(0.0, dtype=torch.float32)
+                breakdown_result_dict[key][experiment][timestamp].append(metric_value)
+
+    # Compute the mean for each metric, experiment, and timestamp
+    result_dict = {}
+    for metric, experiment_dict in breakdown_result_dict.items():
+        result_dict[metric] = {}
+        for experiment, timestamp_dict in experiment_dict.items():
+            for timestamp, values in timestamp_dict.items():
+                # Convert the list of tensors to a single tensor and compute the mean
+                values_tensor = torch.stack(values).float()
+                mean_value = torch.mean(values_tensor)
+                result_dict[metric][(experiment, timestamp)] = mean_value
 
     return result_dict
 
