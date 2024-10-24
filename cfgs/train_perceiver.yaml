@@ -3,7 +3,6 @@ model: perceiver
 # Backbone parameters
 backbone: "resnet50"  # Name of the convolutional backbone to use
 # Use feature output from resnet backbone at intermediate layer (layer0, layer1, layer2)
-interm_layer: null
 
 # Perceiver model parameters
 num_freq_bands: 6  # Number of frequency bands

@@ -32,8 +32,6 @@ dilation: false
 position_embedding: sine
 # Number of feature levels the encoder processes from the backbone
 num_feature_levels: 1
-# Use feature output from resnet backbone at intermediate layer (layer0, layer1, layer2)
-interm_layer: null
 # Transformer
 # Number of encoding layers in the transformer
 enc_layers: 6
