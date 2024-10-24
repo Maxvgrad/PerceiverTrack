@@ -189,7 +189,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     base_ds = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = tuple(k for k in ('bbox', 'segm') if k in postprocessors.keys())
-    coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=args.decrement_person_label_after_loading_into_memory)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
     panoptic_evaluator = None

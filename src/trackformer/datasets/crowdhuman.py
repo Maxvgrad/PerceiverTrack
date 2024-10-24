@@ -28,7 +28,7 @@ def build_crowdhuman(image_set, args):
         return_masks=args.masks,
         prev_frame=args.tracking,
         prev_frame_rnd_augs=prev_frame_rnd_augs,
-        is_deformable_detr_and_mot17=True
+        is_deformable_detr_and_mot17=args.decrement_person_label_after_loading_into_memory
     )
 
     return dataset

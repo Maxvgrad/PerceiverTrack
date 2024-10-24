@@ -33,6 +33,7 @@ class CocoEvaluator(object):
         self.img_ids = []
         self.eval_imgs = {k: [] for k in iou_types}
         self._is_deformable_detr_and_mot17 = is_deformable_detr_and_mot17
+        print(f"CocoEvaluator: increment class labels {is_deformable_detr_and_mot17}")
 
     def update(self, predictions):
         img_ids = list(np.unique(list(predictions.keys())))
