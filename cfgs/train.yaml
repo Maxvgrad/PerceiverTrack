@@ -2,7 +2,7 @@ task: 'train'
 wandb_project: 'detr_track'
 wandb_id: null
 lr: 0.0002
-lr_backbone_names: ['backbone.0', 'backbone']
+lr_backbone_names: ['backbone.0']
 lr_backbone: 0.00002
 lr_linear_proj_names: ['reference_points', 'sampling_offsets']
 lr_linear_proj_mult: 0.1
@@ -146,7 +146,7 @@ num_workers: 2
 val_interval: 5
 debug: false
 # epoch interval for model saving. if 0 only save last and best models
-save_model_interval: 10
+save_model_interval: 5
 # distributed training parameters
 # number of distributed processes
 world_size: 1
