@@ -75,6 +75,7 @@ class DETRTrackingBase(nn.Module):
                 #     continue
 
                 prev_out_ind = prev_out_ind[random_subset_mask]
+                prev_out_ind = prev_out_ind.to(device)
                 prev_target_ind = prev_target_ind[random_subset_mask]
 
             # detected prev frame tracks
@@ -82,7 +83,7 @@ class DETRTrackingBase(nn.Module):
 
             # match track ids between frames
             target_ind_match_matrix = prev_track_ids.unsqueeze(dim=1).eq(target['track_ids'])
-            target_ind_matching = target_ind_match_matrix.any(dim=1)
+            target_ind_matching = target_ind_match_matrix.any(dim=1).to(device)
             target_ind_matched_idx = target_ind_match_matrix.nonzero()[:, 1]
 
             # current frame track ids detected in the prev frame
