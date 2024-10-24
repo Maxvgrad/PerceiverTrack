@@ -1,7 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
-# Modifications copyright (C) 2024 Maksim Ploter
-
 import math
 import random
 from contextlib import nullcontext
@@ -41,120 +39,92 @@ class DETRTrackingBase(nn.Module):
         self._tracking = True
 
     def add_track_queries_to_targets(self, targets, prev_indices, prev_out, add_false_pos=True):
-        """
-            Enhances ground-truth targets by adding track queries from the previous frame's outputs.
-
-            This method manages both positive and negative track queries to assist in associating objects
-            detected in consecutive frames. It is used during the training and evaluation of tracking models
-            based on the DETR architecture.
-
-            Args:
-                targets (list[dict]):
-                    A list of dictionaries where each dictionary contains the ground truth for a sample in the batch.
-                    Each dictionary should include the current frame's object bounding boxes and labels.
-
-                prev_indices (list[tuple]):
-                    A list of tuples where each tuple contains:
-                    - prev_out_ind (torch.Tensor): Indices of the previous frame's predictions that match with the current targets.
-                    - prev_target_ind (torch.Tensor): Indices of the ground truth targets from the previous frame that match the predictions.
-
-                prev_out (dict):
-                    A dictionary containing the outputs from the previous frame, including:
-                    - 'pred_boxes' (torch.Tensor): Predicted bounding boxes from the previous frame.
-                    - 'hs_embed' (torch.Tensor): Embeddings from the previous frame.
-                    Additional items may be included depending on the implementation.
-
-                add_false_pos (bool, optional):
-                    If True, adds false positive track queries to the targets by randomly selecting unmatched predictions
-                    from the previous frame. This simulates incorrect predictions and helps the model learn to identify
-                    and ignore false positives. Default is True.
-
-            Returns:
-                None:
-                    The method modifies the `targets` list in place. It updates the targets with additional track queries,
-                    their corresponding embeddings, bounding boxes, and masks.
-        """
-
         device = prev_out['pred_boxes'].device
 
-        # Calculate the minimum number of previous frame targets across all batches
+        # for i, (target, prev_ind) in enumerate(zip(targets, prev_indices)):
         min_prev_target_ind = min([len(prev_ind[1]) for prev_ind in prev_indices])
-        # Initialize the number of previous frame targets to zero
         num_prev_target_ind = 0
-        # If there are any previous frame targets, randomly select a number of them to use
         if min_prev_target_ind:
-            # Generate a random number between 0 and min_prev_target_ind (inclusive)
-            # to determine how many targets to use
             num_prev_target_ind = torch.randint(0, min_prev_target_ind + 1, (1,)).item()
 
-        # Initialize the number of false positive track queries to zero
         num_prev_target_ind_for_fps = 0
-        # If there are previous frame targets, compute how many of them should be false positives
         if num_prev_target_ind:
-            # Calculate the number of false positive track queries based on the false positive probability
-            # Use math.ceil to ensure we round up to the nearest integer
             num_prev_target_ind_for_fps = \
                 torch.randint(int(math.ceil(self._track_query_false_positive_prob * num_prev_target_ind)) + 1, (1,)).item()
 
         for i, (target, prev_ind) in enumerate(zip(targets, prev_indices)):
             prev_out_ind, prev_target_ind = prev_ind
 
-            # If the false negative probability is non-zero, randomly select a subset of previous targets
-            if self._track_query_false_negative_prob:
-                # Create a random permutation of indices to select a subset of previous targets
-                # Use num_prev_target_ind to determine the size of the subset
+            # random subset
+            if self._track_query_false_negative_prob: # and len(prev_target_ind):
+                # random_subset_mask = torch.empty(len(prev_target_ind)).uniform_()
+                # random_subset_mask = random_subset_mask.ge(
+                #     self._track_query_false_negative_prob)
+
+                # random_subset_mask = torch.randperm(len(prev_target_ind))[:torch.randint(0, len(prev_target_ind) + 1, (1,))]
                 random_subset_mask = torch.randperm(len(prev_target_ind))[:num_prev_target_ind]
 
-                # Apply the random subset mask to select a subset of previous output and target indices
+                # if not len(random_subset_mask):
+                #     target['track_query_hs_embeds'] = torch.zeros(0, self.hidden_dim).float().to(device)
+                #     target['track_queries_placeholder_mask'] = torch.zeros(self.num_queries).bool().to(device)
+                #     target['track_queries_mask'] = torch.zeros(self.num_queries).bool().to(device)
+                #     target['track_queries_fal_pos_mask'] = torch.zeros(self.num_queries).bool().to(device)
+                #     target['track_query_boxes'] = torch.zeros(0, 4).to(device)
+                #     target['track_query_match_ids'] = torch.tensor([]).long().to(device)
+
+                #     continue
+
                 prev_out_ind = prev_out_ind[random_subset_mask]
-                prev_out_ind = prev_out_ind.to(device)
-                prev_target_ind = prev_target_ind[random_subset_mask]  # Select corresponding target indices
+                prev_target_ind = prev_target_ind[random_subset_mask]
 
             # detected prev frame tracks
-            # Extract track IDs from the previous frame for the selected target indices
             prev_track_ids = target['prev_target']['track_ids'][prev_target_ind]
 
             # match track ids between frames
-            # Create a matrix to match previous frame track IDs with current frame track IDs
-            # The matrix will have dimensions (number of previous track IDs) x (number of current track IDs)
             target_ind_match_matrix = prev_track_ids.unsqueeze(dim=1).eq(target['track_ids'])
-
-            # Determine which previous track IDs have a match in the current frame
-            # `any(dim=1)` checks if there's at least one match for each previous track ID
-            target_ind_matching = target_ind_match_matrix.any(dim=1).to(device)
-
-            # Get indices of matched current frame track IDs for each previous track ID
+            target_ind_matching = target_ind_match_matrix.any(dim=1)
             target_ind_matched_idx = target_ind_match_matrix.nonzero()[:, 1]
 
+            # current frame track ids detected in the prev frame
+            # track_ids = target['track_ids'][target_ind_matched_idx]
+
             # index of prev frame detection in current frame box list
-            # Store indices of current frame track IDs that correspond to previous frame detections
             target['track_query_match_ids'] = target_ind_matched_idx
 
             # random false positives
-            # Add random false positives to the predictions if specified
-            if add_false_pos and self._track_query_false_positive_prob:
-                # Extract the matched predicted boxes from the previous frame for the current targets
+            if add_false_pos:
                 prev_boxes_matched = prev_out['pred_boxes'][i, prev_out_ind[target_ind_matching]]
 
-                # Create a list of indices for the predicted boxes that were not matched in the previous step
                 not_prev_out_ind = torch.arange(prev_out['pred_boxes'].shape[1])
                 not_prev_out_ind = [
                     ind.item()
                     for ind in not_prev_out_ind
                     if ind not in prev_out_ind]
 
-                # List to hold indices of random false positives
                 random_false_out_ind = []
 
-                # Select a subset of previous target indices to generate false positives
                 prev_target_ind_for_fps = torch.randperm(num_prev_target_ind)[:num_prev_target_ind_for_fps]
 
-                # Iterate through the selected previous target indices for generating false positives
+                # for j, prev_box_matched in enumerate(prev_boxes_matched):
+                #     if j not in prev_target_ind_for_fps:
+                #         continue
+
                 for j in prev_target_ind_for_fps:
-                    # Extract the unmatched predicted boxes from the previous frame
+                    # if random.uniform(0, 1) < self._track_query_false_positive_prob:
                     prev_boxes_unmatched = prev_out['pred_boxes'][i, not_prev_out_ind]
 
-                    # Compute distances between matched boxes and unmatched boxes
+                    # only cxcy
+                    # box_dists = prev_box_matched[:2].sub(prev_boxes_unmatched[:, :2]).abs()
+                    # box_dists = box_dists.pow(2).sum(dim=-1).sqrt()
+                    # box_weights = 1.0 / box_dists.add(1e-8)
+
+                    # prev_box_ious, _ = box_ops.box_iou(
+                    #     box_ops.box_cxcywh_to_xyxy(prev_box_matched.unsqueeze(dim=0)),
+                    #     box_ops.box_cxcywh_to_xyxy(prev_boxes_unmatched))
+                    # box_weights = prev_box_ious[0]
+
+                    # dist = sqrt( (x2 - x1)**2 + (y2 - y1)**2 )
+
                     if len(prev_boxes_matched) > j:
                         prev_box_matched = prev_boxes_matched[j]
                         box_weights = \
@@ -163,37 +133,47 @@ class DETRTrackingBase(nn.Module):
                         box_weights = box_weights[:, 0] ** 2 + box_weights[:, 0] ** 2
                         box_weights = torch.sqrt(box_weights)
 
-                        # Choose a random false positive based on the computed weights
+                        # if box_weights.gt(0.0).any():
+                        # if box_weights.gt(0.0).any():
                         random_false_out_idx = not_prev_out_ind.pop(
                             torch.multinomial(box_weights.cpu(), 1).item())
                     else:
-                        # If there are not enough matched boxes, pick a random index from unmatched boxes
                         random_false_out_idx = not_prev_out_ind.pop(torch.randperm(len(not_prev_out_ind))[0])
 
-                    # Add the selected false positive index to the list
                     random_false_out_ind.append(random_false_out_idx)
 
                 prev_out_ind = torch.tensor(prev_out_ind.tolist() + random_false_out_ind).long()
 
-                # Update the match matrix to include false positives
                 target_ind_matching = torch.cat([
                     target_ind_matching,
                     torch.tensor([False, ] * len(random_false_out_ind)).bool().to(device)
                 ])
 
-            # Create masks for track queries
-            # Mask indicating which track queries are active (matched) vs. inactive (not matched)
+            # MSDeformAttn can not deal with empty inputs therefore we
+            # add single false pos to have at least one track query per sample
+            # not_prev_out_ind = torch.tensor([
+            #     ind
+            #     for ind in torch.arange(prev_out['pred_boxes'].shape[1])
+            #     if ind not in prev_out_ind])
+            # false_samples_inds = torch.randperm(not_prev_out_ind.size(0))[:1]
+            # false_samples = not_prev_out_ind[false_samples_inds]
+            # prev_out_ind = torch.cat([prev_out_ind, false_samples])
+            # target_ind_matching = torch.tensor(
+            #     target_ind_matching.tolist() + [False, ]).bool().to(target_ind_matching.device)
+
+            # track query masks
             track_queries_mask = torch.ones_like(target_ind_matching).bool()
             track_queries_fal_pos_mask = torch.zeros_like(target_ind_matching).bool()
             track_queries_fal_pos_mask[~target_ind_matching] = True
 
-            # Put previous hidden state as it is for perceiver model
-            target['_hs_embed'] = prev_out['hs_embed'][i]
-            # Update target information with the previous frame's embeddings and bounding boxes
+            # track_queries_match_mask = torch.ones_like(target_ind_matching).float()
+            # matches indices with 1.0 and not matched -1.0
+            # track_queries_mask[~target_ind_matching] = -1.0
+
+            # set prev frame info
             target['track_query_hs_embeds'] = prev_out['hs_embed'][i, prev_out_ind]
             target['track_query_boxes'] = prev_out['pred_boxes'][i, prev_out_ind].detach()
 
-            # Extend masks to include placeholders for additional queries if necessary
             target['track_queries_mask'] = torch.cat([
                 track_queries_mask,
                 torch.tensor([False, ] * self.num_queries).to(device)
@@ -203,6 +183,40 @@ class DETRTrackingBase(nn.Module):
                 track_queries_fal_pos_mask,
                 torch.tensor([False, ] * self.num_queries).to(device)
             ]).bool()
+
+        # add placeholder track queries to allow for batch sizes > 1
+        # max_track_query_hs_embeds = max([len(t['track_query_hs_embeds']) for t in targets])
+        # for i, target in enumerate(targets):
+
+        #     num_add = max_track_query_hs_embeds - len(target['track_query_hs_embeds'])
+
+        #     if not num_add:
+        #         target['track_queries_placeholder_mask'] = torch.zeros_like(target['track_queries_mask']).bool()
+        #         continue
+
+        #     raise NotImplementedError
+
+        #     target['track_query_hs_embeds'] = torch.cat(
+        #         [torch.zeros(num_add, self.hidden_dim).to(device),
+        #          target['track_query_hs_embeds']
+        #     ])
+        #     target['track_query_boxes'] = torch.cat(
+        #         [torch.zeros(num_add, 4).to(device),
+        #          target['track_query_boxes']
+        #     ])
+
+        #     target['track_queries_mask'] = torch.cat([
+        #         torch.tensor([True, ] * num_add).to(device),
+        #         target['track_queries_mask']
+        #     ]).bool()
+
+        #     target['track_queries_fal_pos_mask'] = torch.cat([
+        #         torch.tensor([False, ] * num_add).to(device),
+        #         target['track_queries_fal_pos_mask']
+        #     ]).bool()
+
+        #     target['track_queries_placeholder_mask'] = torch.zeros_like(target['track_queries_mask']).bool()
+        #     target['track_queries_placeholder_mask'][:num_add] = True
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         if targets is not None and not self._tracking:

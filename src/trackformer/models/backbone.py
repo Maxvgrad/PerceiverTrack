@@ -2,16 +2,18 @@
 """
 Backbone modules.
 """
-from typing import Dict, List, Set
+from typing import Dict, List
 
 import torch
 import torch.nn.functional as F
 import torchvision
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
+from torchvision.ops.feature_pyramid_network import (FeaturePyramidNetwork,
+                                                     LastLevelMaxPool)
 
-from .position_encoding import build_position_encoding
 from ..util.misc import NestedTensor, is_main_process
+from .position_encoding import build_position_encoding
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -56,12 +58,13 @@ class FrozenBatchNorm2d(torch.nn.Module):
 class BackboneBase(nn.Module):
 
     def __init__(self, backbone: nn.Module, train_backbone: bool,
-                 return_interm_layers: bool, layers_used: Set = None):
+                 return_interm_layers: bool):
         super().__init__()
-        if layers_used is None:
-            layers_used = {'layer1', 'layer2', 'layer3', 'layer4'}
         for name, parameter in backbone.named_parameters():
-            if not train_backbone or not any(layer in name for layer in layers_used):
+            if (not train_backbone
+                or 'layer2' not in name
+                and 'layer3' not in name
+                and 'layer4' not in name):
                 parameter.requires_grad_(False)
         if return_interm_layers:
             return_layers = {"layer1": "0", "layer2": "1", "layer3": "2", "layer4": "3"}
@@ -90,16 +93,16 @@ class Backbone(BackboneBase):
     def __init__(self, name: str,
                  train_backbone: bool,
                  return_interm_layers: bool,
-                 dilation: bool,
-                 layers_used: Set[str] = None):
+                 dilation: bool):
         norm_layer = FrozenBatchNorm2d
         backbone = getattr(torchvision.models, name)(
             replace_stride_with_dilation=[False, False, dilation],
             pretrained=is_main_process(), norm_layer=norm_layer)
         super().__init__(backbone, train_backbone,
-                         return_interm_layers, layers_used)
+                         return_interm_layers)
         if dilation:
             self.strides[-1] = self.strides[-1] // 2
+
 
 class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
@@ -146,12 +149,9 @@ def build_backbone(args):
     elif args.model == 'perceiver':
         if args.backbone == 'resnet50':
             train_backbone = args.lr_backbone > 0
-            return_interm_layers = bool(args.interm_layer)
-            layers_used = {f'layer{i}' for i in range(1, int(args.interm_layer) + 2)} if return_interm_layers else None
-            print(f'interm_layer: {args.interm_layer}, return_interm_layers: {return_interm_layers}, layers_used: {layers_used}')
-            backbone = Backbone(args.backbone, train_backbone, return_interm_layers, args.dilation,
-                                layers_used=layers_used)
+            return_interm_layers = args.masks or (args.num_feature_levels > 1)
+            backbone = Backbone(args.backbone, train_backbone, return_interm_layers, args.dilation)
             # For perceiver models we return backbone's feature output from particular layer
-            return IntermediateLayerGetterBackbone(layer=args.interm_layer, backbone=backbone)
+            return IntermediateLayerGetterBackbone(layer=None, backbone=backbone)
 
     raise NotImplementedError('Backbone {} not implemented'.format(args.backbone))

@@ -177,6 +177,47 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
         return img, target
 
+    # def _add_random_jitter(self, img, target):
+    #     if self._prev_frame_rnd_augs: # and random.uniform(0, 1) < 0.5:
+    #         orig_w, orig_h = img.size
+
+    #         width, height = img.size
+    #         size = random.randint(
+    #             int((1.0 - self._prev_frame_rnd_augs) * min(width, height)),
+    #             int((1.0 + self._prev_frame_rnd_augs) * min(width, height)))
+    #         img, target = T.RandomResize([size])(img, target)
+
+    #         width, height = img.size
+    #         min_size = (
+    #             int((1.0 - self._prev_frame_rnd_augs) * width),
+    #             int((1.0 - self._prev_frame_rnd_augs) * height))
+    #         transform = T.RandomSizeCrop(min_size=min_size)
+    #         img, target = transform(img, target)
+
+    #         width, height = img.size
+    #         if orig_w < width:
+    #             img, target = T.RandomCrop((height, orig_w))(img, target)
+    #         else:
+    #             total_pad = orig_w - width
+    #             pad_left = random.randint(0, total_pad)
+    #             pad_right = total_pad - pad_left
+
+    #             padding = (pad_left, 0, pad_right, 0)
+    #             img, target = T.pad(img, target, padding)
+
+    #         width, height = img.size
+    #         if orig_h < height:
+    #             img, target = T.RandomCrop((orig_h, width))(img, target)
+    #         else:
+    #             total_pad = orig_h - height
+    #             pad_top = random.randint(0, total_pad)
+    #             pad_bottom = total_pad - pad_top
+
+    #             padding = (0, pad_top, 0, pad_bottom)
+    #             img, target = T.pad(img, target, padding)
+
+    #     return img, target
+
     def __getitem__(self, idx):
         random_state = {
             'random': random.getstate(),
@@ -184,18 +225,16 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         img, target = self._getitem_from_id(idx, random_state, random_jitter=False)
 
         if self._prev_frame:
-            imgs = [img]
-            targets = [target]
+            # PREV
             prev_img, prev_target = self._getitem_from_id(idx, random_state)
+            target[f'prev_image'] = prev_img
+            target[f'prev_target'] = prev_target
 
-            imgs.append(prev_img)
-            targets.append(prev_target)
             if self._prev_prev_frame:
+                # PREV PREV
                 prev_prev_img, prev_prev_target = self._getitem_from_id(idx, random_state)
-                imgs.append(prev_prev_img)
-                targets.append(prev_prev_target)
-
-            return imgs, targets
+                target[f'prev_prev_image'] = prev_prev_img
+                target[f'prev_prev_target'] = prev_prev_target
 
         return img, target
 
@@ -203,7 +242,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         pass
 
     def __len__(self) -> int:
-        return len(self.ids) // (self._sequence_frames if self._sequence_frames else 1)
+        if self._sequence_frames:
+            return len(self.ids) // self._sequence_frames
+        else:
+            return super().__len__()
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):

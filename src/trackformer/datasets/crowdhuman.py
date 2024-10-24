@@ -19,9 +19,7 @@ def build_crowdhuman(image_set, args):
     if image_set == 'train':
         prev_frame_rnd_augs = args.coco_and_crowdhuman_prev_frame_rnd_augs
     elif image_set == 'val':
-        # We add rand augmentation for validation in order to validate
-        # model's ability to predict objects in autoregressive way
-        prev_frame_rnd_augs = args.coco_and_crowdhuman_prev_frame_rnd_augs
+        prev_frame_rnd_augs = 0.0
 
     transforms, norm_transforms = make_coco_transforms(
         image_set, args.img_transform, args.overflow_boxes)
@@ -29,6 +27,8 @@ def build_crowdhuman(image_set, args):
         img_folder, ann_file, transforms, norm_transforms,
         return_masks=args.masks,
         prev_frame=args.tracking,
-        prev_frame_rnd_augs=prev_frame_rnd_augs)
+        prev_frame_rnd_augs=prev_frame_rnd_augs,
+        is_deformable_detr_and_mot17=True
+    )
 
     return dataset
