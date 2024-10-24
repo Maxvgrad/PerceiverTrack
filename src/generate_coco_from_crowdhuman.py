@@ -127,5 +127,6 @@ def generate_coco_from_crowdhuman(split_name='train_val', split='train_val'):
 
 
 if __name__ == '__main__':
+    generate_coco_from_crowdhuman(split_name='train_val', split='train_val')
     generate_coco_from_crowdhuman(split_name='train', split='train')
     generate_coco_from_crowdhuman(split_name='val', split='val')
