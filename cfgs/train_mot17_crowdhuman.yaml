@@ -11,3 +11,5 @@ resume: models/crowdhuman_deformable_trackformer/checkpoint_epoch_80.pth
 
 epochs: 40
 lr_drop: 10
+
+decrement_person_label_after_loading_into_memory: true
