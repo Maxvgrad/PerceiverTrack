@@ -174,6 +174,7 @@ def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
 
                     model = DeformableDETRArTracking(tracking_kwargs, detr_kwargs)
                 else:
+                    print(f'Building deformable detr tracking model')
                     model = DeformableDETRTracking(tracking_kwargs, detr_kwargs)
         else:
             if args.masks:
