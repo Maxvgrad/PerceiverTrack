@@ -33,7 +33,7 @@ def generate_coco_from_crowdhuman(split_name='train_val', split='train_val'):
             datalist = anno_file.readlines()
             for data in datalist:
                 json_data = json.loads(data)
-                img_path = json_data['ID'] + '.jpg'
+                img_path = os.path.join(DATA_ROOT, split, json_data['ID'], '.jpg')
                 imgs_list_dir.append(img_path)
     else:
         # Case when we combine all splits into one (train val into train_val)
