@@ -165,7 +165,7 @@ def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
             if args.masks:
                 model = DeformableDETRSegmTracking(mask_kwargs, tracking_kwargs, detr_kwargs)
             else:
-                if hasattr(args, 'sequence_frames') and args.sequence_frames > 1:
+                if hasattr(args, 'sequence_frames') and args.sequence_frames is not None and args.sequence_frames > 1:
                     print(f'Building autoregressive deformable detr model')
                     tracking_kwargs['track_obj_score_threshold'] = 0.4
                     tracking_kwargs['obj_detector_post'] = obj_detector_post
