@@ -6,7 +6,6 @@ import logging
 import math
 import os
 import sys
-from collections import defaultdict
 from typing import Iterable
 
 import torch
@@ -190,10 +189,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     base_ds = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = tuple(k for k in ('bbox', 'segm') if k in postprocessors.keys())
-
-    is_deformable_detr_and_mot17 = args.dataset == 'mot'  # There's a potential collision with other MOT datasets
-    coco_evaluators_per_experiment_and_timestamp = {}
-    track_query_use_per_experiment_and_timestamp = {}
+    coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
@@ -236,23 +233,13 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         else:
             results_orig, _ = make_results(outputs, targets, postprocessors, args.tracking)
 
-        track_query_use_per_experiment_and_timestamp = calculate_mean_tracks_queries_used_by_exp_and_ts(targets)
-        # Break evaluation by the number of dropped frames
-        experiment_results = partition_by_experiment_and_timestamp(results_orig, targets)
+        # TODO. remove cocoDts from coco eval and change example results output
+        if coco_evaluator is not None:
+            results_orig = {
+                target['image_id'].item(): output
+                for target, output in zip(targets, results_orig)}
 
-        # Init coco evaluator
-        for experiment, experiment_results in experiment_results.items():
-            # Ensure we have a dictionary for each experiment in the main coco_evaluators dictionary
-            if experiment not in coco_evaluators_per_experiment_and_timestamp:
-                coco_evaluators_per_experiment_and_timestamp[experiment] = {}
-
-            for timestamp, r in experiment_results.items():
-                if timestamp not in coco_evaluators_per_experiment_and_timestamp[experiment]:
-                    coco_evaluators_per_experiment_and_timestamp[experiment][timestamp] = CocoEvaluator(
-                        base_ds, iou_types, is_deformable_detr_and_mot17=is_deformable_detr_and_mot17
-                    )
-
-                coco_evaluators_per_experiment_and_timestamp[experiment][timestamp].update(r)
+            coco_evaluator.update(results_orig)
 
         if panoptic_evaluator is not None:
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -270,37 +257,24 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    if coco_evaluators_per_experiment_and_timestamp:
-        for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
-            print(f'Syncing experiment {experiment} {len(evaluators)} coco evaluators across processes...')
-            for timestamp, ce in evaluators.items():
-                ce.synchronize_between_processes()
+    if coco_evaluator is not None:
+        coco_evaluator.synchronize_between_processes()
     if panoptic_evaluator is not None:
         panoptic_evaluator.synchronize_between_processes()
 
     # accumulate predictions from all images
-    if coco_evaluators_per_experiment_and_timestamp:
-        for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
-            print(f'Accumulating results per experiment {experiment} {len(evaluators)} coco evaluators')
-            for timestamp, ce in evaluators.items():
-                ce.accumulate()
-                ce.summarize()
-
+    if coco_evaluator is not None:
+        coco_evaluator.accumulate()
+        coco_evaluator.summarize()
     panoptic_res = None
     if panoptic_evaluator is not None:
         panoptic_res = panoptic_evaluator.summarize()
     stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
-    if coco_evaluators_per_experiment_and_timestamp:
-        for experiment, evaluators in coco_evaluators_per_experiment_and_timestamp.items():
-            print(f'Store {experiment} {len(evaluators)} coco evaluator breakdown results')
-            for timestamp, ce in evaluators.items():
-                stats[f'coco_eval_bbox_{experiment}_{timestamp}'] = ce.coco_eval['bbox'].stats.tolist()
-
-    if track_query_use_per_experiment_and_timestamp:
-        for metric, experiment_timestamp_dict in track_query_use_per_experiment_and_timestamp.items():
-            for (experiment, timestamp), mean_value in experiment_timestamp_dict.items():
-                stats[f'{metric.replace("custom_numeric_metric_", "")}_{experiment}_{timestamp}'] = mean_value.item()
-
+    if coco_evaluator is not None:
+        if 'bbox' in coco_evaluator.coco_eval:
+            stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
+        if 'segm' in coco_evaluator.coco_eval:
+            stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
     if panoptic_res is not None:
         stats['PQ_all'] = panoptic_res["All"]
         stats['PQ_th'] = panoptic_res["Things"]
@@ -384,56 +358,3 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         exit()
 
     return stats, eval_stats
-
-
-def calculate_mean_tracks_queries_used_by_exp_and_ts(targets):
-    breakdown_result_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-
-    # Iterate through targets and group by experiment and timestamp for each custom metric
-    for t in targets:
-        experiment = t.get('experiment')  # Extract the 'experiment' key
-        timestamp = t.get('timestamp')    # Extract the 'timestamp' key
-
-        for key, value in t.items():
-            if key.startswith("custom_numeric_metric_"):
-                metric_value = value if value is not None else torch.tensor(0.0, dtype=torch.float32)
-                breakdown_result_dict[key][experiment][timestamp].append(metric_value)
-
-    # Compute the mean for each metric, experiment, and timestamp
-    result_dict = {}
-    for metric, experiment_dict in breakdown_result_dict.items():
-        result_dict[metric] = {}
-        for experiment, timestamp_dict in experiment_dict.items():
-            for timestamp, values in timestamp_dict.items():
-                # Convert the list of tensors to a single tensor and compute the mean
-                values_tensor = torch.stack(values).float()
-                mean_value = torch.mean(values_tensor)
-                result_dict[metric][(experiment, timestamp)] = mean_value
-
-    return result_dict
-
-
-def partition_by_experiment_and_timestamp(results_orig, targets):
-    result = {}
-    for target, output in zip(targets, results_orig):
-        experiment = target['experiment']
-
-        if experiment not in result:
-            result[experiment] = {}
-
-        experiment_result_dict = result[experiment]
-        timestamp = target['timestamp'].item()
-        image_id = target['image_id'].item()
-
-        if timestamp in experiment_result_dict:
-            if image_id in experiment_result_dict[timestamp]:
-                print(
-                    f'Warn overriding results for experiment {experiment} '
-                    f'timestamp {timestamp} image id {image_id}'
-                )
-            experiment_result_dict[timestamp][image_id] = output
-        else:
-            experiment_result_dict[timestamp] = {
-                image_id: output
-            }
-    return result
