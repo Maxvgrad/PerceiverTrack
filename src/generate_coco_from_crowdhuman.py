@@ -4,8 +4,9 @@ Generates COCO data and annotation structure from CrowdHuman data.
 """
 import json
 import os
-
 import cv2
+
+from generate_coco_from_mot import check_coco_from_mot
 
 DATA_ROOT = 'data/CrowdHuman'
 VIS_THRESHOLD = 0.0
@@ -24,21 +25,8 @@ def generate_coco_from_crowdhuman(split_name='train_val', split='train_val'):
     annotations['annotations'] = []
     annotation_file = os.path.join(DATA_ROOT, f'annotations/{split_name}.json')
 
-    odgt_annos_file = os.path.join(DATA_ROOT, f'annotations/annotation_{split}.odgt')
-
-    imgs_list_dir = []
-
-    if os.path.exists(odgt_annos_file):
-        with open(odgt_annos_file, 'r+') as anno_file:
-            datalist = anno_file.readlines()
-            for data in datalist:
-                json_data = json.loads(data)
-                img_path = json_data['ID'] + '.jpg'
-                imgs_list_dir.append(img_path)
-    else:
-        # Case when we combine all splits into one (train val into train_val)
-        imgs_list_dir = os.listdir(os.path.join(DATA_ROOT, split))
-
+    # IMAGES
+    imgs_list_dir = os.listdir(os.path.join(DATA_ROOT, split))
     for i, img in enumerate(sorted(imgs_list_dir)):
         im = cv2.imread(os.path.join(DATA_ROOT, split, img))
         h, w, _ = im.shape
@@ -127,5 +115,9 @@ def generate_coco_from_crowdhuman(split_name='train_val', split='train_val'):
 
 
 if __name__ == '__main__':
-    generate_coco_from_crowdhuman(split_name='train', split='train')
-    generate_coco_from_crowdhuman(split_name='val', split='val')
+    generate_coco_from_crowdhuman(split_name='train_val', split='train_val')
+    # generate_coco_from_crowdhuman(split_name='train', split='train')
+
+    # coco_dir = os.path.join('data/CrowdHuman', 'train_val')
+    # annotation_file = os.path.join('data/CrowdHuman/annotations', 'train_val.json')
+    # check_coco_from_mot(coco_dir, annotation_file, img_id=9012)
