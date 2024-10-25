@@ -24,6 +24,21 @@
 ##SBATCH --gres=gpu:a100-80g:2
 ##SBATCH --cpus-per-task=16
 
+#----------------------------------------
+# Parse Arguments
+#----------------------------------------
+resume_flag=false
+while getopts "r" opt; do
+  case ${opt} in
+    r )
+      resume_flag=true
+      ;;
+    \? )
+      echo "Usage: cmd [-r] to enable resume"
+      exit 1
+      ;;
+  esac
+done
 
 #----------------------------------------
 # Environment Setup
@@ -67,11 +82,20 @@ echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 #----------------------------------------
 # Training Command
 #----------------------------------------
-# Checkpoint configuration (commented out)
-checkpoint=$output_dir/checkpoint.pth
-#wandb_id="6gv1r2h1"
-#resume_optim=True
-#resume=$checkpoint
+
+# Set parameters based on resume flag
+if [ "$resume_flag" = true ]; then
+    checkpoint=$output_dir/checkpoint.pth
+    wandb_id="djiokxzk"
+    resume_optim=true
+    resume=$checkpoint
+    echo "Resuming training from checkpoint: $checkpoint"
+else
+    wandb_id=None  # Set this to an empty string or a default value if necessary
+    resume_optim=false
+    resume=""  # No resume
+    echo "Starting new training run."
+fi
 
 # Launch training
 srun python src/train.py with \
@@ -80,4 +104,7 @@ srun python src/train.py with \
     multi_frame \
     tracking \
     output_dir=$output_dir \
-    wandb_project='trackformer-train-from-scratch'
+    wandb_project='trackformer-train-from-scratch' \
+    wandb_id="$wandb_id" \
+    resume_optim="$resume_optim" \
+    resume="$resume"
