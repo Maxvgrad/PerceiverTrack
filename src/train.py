@@ -46,6 +46,10 @@ def train(args: Namespace) -> None:
     utils.init_distributed_mode(args)
     print("git:\n  {}\n".format(utils.get_sha()))
 
+    if is_main_process():
+        print(f'Init wandb in process rank: {get_rank()}')
+        wandb.init(**get_wandb_init_config(args))
+
     if args.debug:
         # args.tracking_eval = False
         args.num_workers = 0
@@ -467,7 +471,4 @@ if __name__ == '__main__':
     if args.task == 'tune':
         run_sweep(args)
     else:
-        if is_main_process():
-            print(f'Init wandb in process rank: {get_rank()}')
-            wandb.init(**get_wandb_init_config(args))
         train(args)
