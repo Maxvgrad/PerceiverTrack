@@ -19,7 +19,7 @@ import trackformer.util.misc as utils
 from trackformer.datasets import build_dataset
 from trackformer.engine import evaluate, train_one_epoch
 from trackformer.models import build_model
-from trackformer.util.misc import nested_dict_to_namespace
+from trackformer.util.misc import nested_dict_to_namespace, is_main_process, get_rank
 from trackformer.util.plot_utils import get_vis_win_names
 from trackformer.vis import build_visualizers
 
@@ -292,8 +292,8 @@ def train(args: Namespace) -> None:
         log_stats = {**{f'test_{k}': v for k, v in flattened_test_stats.items()},
                      'epoch': 1,
                      'n_parameters': n_parameters}
-
-        wandb.log(log_stats, step=1)
+        if is_main_process():
+            wandb.log(log_stats, step=1)
 
         return
 
@@ -355,9 +355,9 @@ def train(args: Namespace) -> None:
                      'epoch': epoch,
                      'n_parameters': n_parameters}
 
-        print(json.dumps(log_stats, indent=2))
-
-        wandb.log(log_stats, step=epoch)
+        if is_main_process():
+            print(json.dumps(log_stats, indent=2))
+            wandb.log(log_stats, step=epoch)
 
         # MODEL SAVING
         if args.output_dir:
@@ -467,5 +467,7 @@ if __name__ == '__main__':
     if args.task == 'tune':
         run_sweep(args)
     else:
-        wandb.init(**get_wandb_init_config(args))
+        if is_main_process():
+            print(f'Init wandb in process rank: {get_rank()}')
+            wandb.init(**get_wandb_init_config(args))
         train(args)
