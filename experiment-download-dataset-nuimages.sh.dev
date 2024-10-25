@@ -21,10 +21,8 @@ download_and_extract() {
 
   echo "Downloading $output_file..."
 
-  exit 1
-
   # Download the file with resume option
-  curl -C - "$url" -o "$output_file" \
+  curl "$url" -o "$output_file" \
     -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
     -H 'Accept-Language: en-GB,en-US;q=0.9,en;q=0.8,ru;q=0.7' \
     -H 'Connection: keep-alive' \
@@ -67,13 +65,13 @@ download_and_extract "https://d36yt3mvayqw5m.cloudfront.net/public/nuimages-v1.0
 
 # Sweeps
 ## back
-#download_and_extract 'https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-back-left.tgz'
-#download_and_extract 'https://d36yt3mvayqw5m.cloudfront.net/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-back-right.tgz'
-#download_and_extract 'https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-back.tgz'
+download_and_extract 'https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-back-left.tgz'
+download_and_extract 'https://d36yt3mvayqw5m.cloudfront.net/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-back-right.tgz'
+download_and_extract 'https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-back.tgz'
 
 # front
-#download_and_extract "https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-front-left.tgz"
-#download_and_extract "https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-front-right.tgz"
+download_and_extract "https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-front-left.tgz"
+download_and_extract "https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-front-right.tgz"
 download_and_extract "https://motional-nuscenes.s3.amazonaws.com/public/nuimages-v1.0/nuimages-v1.0-all-sweeps-cam-front.tgz"
 
 echo "All downloads and extractions complete."
