@@ -103,6 +103,7 @@ srun python src/train.py with \
     deformable \
     multi_frame \
     tracking \
+    world_size=$WORLD_SIZE \
     output_dir=$output_dir \
     wandb_project='trackformer-train-from-scratch' \
     wandb_id="$wandb_id" \
