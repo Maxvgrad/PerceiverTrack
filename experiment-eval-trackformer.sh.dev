@@ -1,0 +1,79 @@
+#!/bin/bash -l
+
+#SBATCH -A bolt
+#SBATCH --job-name="bolt-internship-train-trackformer-private-step-1-crowdhuman"
+#SBATCH --time=24:00:00
+#SBATCH --partition=gpu
+#SBATCH --output=not_tracked_dir/slurm/%j_slurm_%x.out
+
+# Resource allocation
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=16G
+
+# Node configurations (commented out)
+## falcone configurations
+#SBATCH --gres=gpu:tesla:1
+#SBATCH --cpus-per-task=4
+
+## Pegasus configuration
+##SBATCH --gres=gpu:a100-40g:1
+##SBATCH --cpus-per-task=24
+
+## Pegasus2 configuration
+##SBATCH --gres=gpu:a100-80g:1
+##SBATCH --cpus-per-task=16
+
+#----------------------------------------
+# Parse Arguments
+#----------------------------------------
+checkpoint_file=""
+while getopts "rc:" opt; do
+  case ${opt} in
+    c )
+      checkpoint_file=$OPTARG
+      ;;
+    \? )
+      echo "Usage: cmd [-r] to enable resume, -c <checkpoint_file> to specify a checkpoint file"
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$checkpoint_file" ]; then
+    echo "Error: -c <checkpoint_file> is required."
+    exit 1
+fi
+
+#----------------------------------------
+# Environment Setup
+#----------------------------------------
+module load miniconda3
+conda activate perceiver_track
+
+#----------------------------------------
+# Distributed Training Setup
+#----------------------------------------
+# Set master node address
+master_addr=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+export MASTER_ADDR=$master_addr
+export MASTER_PORT=12381
+
+# Calculate world size for distributed training
+export WORLD_SIZE=$(($SLURM_NNODES * $SLURM_NTASKS_PER_NODE))
+
+# Enable NCCL debugging
+export NCCL_DEBUG=INFO
+
+#----------------------------------------
+# Debug Information
+#----------------------------------------
+echo "MASTER_ADDR=$MASTER_ADDR"
+echo "WORLD_SIZE=$WORLD_SIZE"
+echo "SLURM_PROCID=$SLURM_PROCID"
+echo "RANK=$RANK"
+echo "output_dir=$output_dir"
+echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
+
+srun python src/track.py with \
+    obj_detect_checkpoint_file=$checkpoint_file
