@@ -81,7 +81,7 @@ class PostProcessResultSave(nn.Module):
 
         results_orig = [
             {'scores': s, 'labels': l, 'boxes': b}
-            for s, l, b, s_n_o in zip(scores, labels, boxes)]
+            for s, l, b in zip(scores, labels, boxes)]
 
         experiment_results = self.partition_by_experiment_and_timestamp(results_orig, targets)
 
