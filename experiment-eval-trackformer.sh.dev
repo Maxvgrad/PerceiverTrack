@@ -28,14 +28,17 @@
 # Parse Arguments
 #----------------------------------------
 checkpoint_file=""
-output_dir="models/crowdhuman_deformable_multi_frame_reproduce"
+output_dir=""
 while getopts "rc:" opt; do
   case ${opt} in
+    o )
+      output_dir=$OPTARG
+      ;;
     c )
       checkpoint_file=$OPTARG
       ;;
     \? )
-      echo "Usage: cmd [-r] to enable resume, -c <checkpoint_file> to specify a checkpoint file"
+      echo "Usage: cmd [-r] to enable resume, -o <output_dir> -c <checkpoint_file> to specify a checkpoint file"
       exit 1
       ;;
   esac
@@ -43,6 +46,11 @@ done
 
 if [ -z "$checkpoint_file" ]; then
     echo "Error: -c <checkpoint_file> is required."
+    exit 1
+fi
+
+if [ -z "output_dir" ]; then
+    echo "Error: -o <output_dir> is required."
     exit 1
 fi
 
@@ -74,6 +82,7 @@ echo "WORLD_SIZE=$WORLD_SIZE"
 echo "SLURM_PROCID=$SLURM_PROCID"
 echo "RANK=$RANK"
 echo "output_dir=$output_dir"
+echo "checkpoint_file=$checkpoint_file"
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 
 seeds=(301)
@@ -89,9 +98,10 @@ for seed in "${seeds[@]}"; do
         world_size=$WORLD_SIZE \
         output_dir=$output_dir \
         wandb_project='trackformer-train-from-scratch' \
-        resume=$checkpoint_file \
+        resume="${output_dir}/${checkpoint_file}" \
         eval_only=True \
         tracking_eval=False \
+        tracking=True \
         seed=$seed \
         disable_propagate_track_query_experiment=True \
         sequence_frames=16
