@@ -15,6 +15,7 @@ from .datasets import get_coco_api_from_dataset
 from .datasets.coco_eval import CocoEvaluator
 from .datasets.panoptic_eval import PanopticEvaluator
 from .models.detr_segmentation import DETRSegm
+from .result_saver import ResultSaver
 from .util import misc as utils
 from .util.box_ops import box_iou
 from .util.track_utils import evaluate_mot_accums
@@ -192,6 +193,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=args.decrement_person_label_after_loading_into_memory)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
+    result_saver = None
+    if 'result_saver' in postprocessors.keys():
+        result_saver = ResultSaver(file_name=os.path.join(output_dir, "results.csv"))
+
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
         panoptic_evaluator = PanopticEvaluator(
@@ -240,6 +245,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 for target, output in zip(targets, results_orig)}
 
             coco_evaluator.update(results_orig)
+
+        if result_saver is not None:
+            result_saver.save(postprocessors['result_saver'](outputs, targets))
 
         if panoptic_evaluator is not None:
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)

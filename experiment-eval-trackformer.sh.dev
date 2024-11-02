@@ -28,6 +28,7 @@
 # Parse Arguments
 #----------------------------------------
 checkpoint_file=""
+output_dir="models/crowdhuman_deformable_multi_frame_reproduce"
 while getopts "rc:" opt; do
   case ${opt} in
     c )
@@ -75,5 +76,23 @@ echo "RANK=$RANK"
 echo "output_dir=$output_dir"
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 
-srun python src/track.py with \
-    obj_detect_checkpoint_file=$checkpoint_file
+seeds=(301)
+
+# Loop over the seeds and run the training script
+for seed in "${seeds[@]}"; do
+    echo "Running evaluation with seed $seed"
+    python src/train.py with \
+        mot17 \
+        deformable \
+        batch_size=1 \
+        multi_frame \
+        world_size=$WORLD_SIZE \
+        output_dir=$output_dir \
+        wandb_project='trackformer-train-from-scratch' \
+        resume=$checkpoint_file \
+        eval_only=True \
+        tracking_eval=False \
+        seed=$seed \
+        disable_propagate_track_query_experiment=True \
+        sequence_frames=16
+done
