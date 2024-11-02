@@ -29,7 +29,7 @@
 #----------------------------------------
 checkpoint_file=""
 output_dir=""
-while getopts "rc:" opt; do
+while getopts "o:c:" opt; do
   case ${opt} in
     o )
       output_dir=$OPTARG
@@ -38,7 +38,7 @@ while getopts "rc:" opt; do
       checkpoint_file=$OPTARG
       ;;
     \? )
-      echo "Usage: cmd [-r] to enable resume, -o <output_dir> -c <checkpoint_file> to specify a checkpoint file"
+      echo "Usage: cmd -o <output_dir> specify a output dir, -c <checkpoint_file> to specify a checkpoint file"
       exit 1
       ;;
   esac
