@@ -195,7 +195,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     result_saver = None
     if 'result_saver' in postprocessors.keys():
-        result_saver = ResultSaver(file_name=os.path.join(output_dir, "results.csv"))
+        result_saver = ResultSaver(file_name=os.path.join(output_dir, args.result_file))
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():

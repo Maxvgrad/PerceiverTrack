@@ -13,36 +13,49 @@ class ResultSaver:
     def __init__(self, file_name):
         self._file_name = file_name
         assert file_name.endswith('.csv'), "File must be a .csv file"
+        self._file_exists = os.path.isfile(self._file_name)
+        self._buffer = []
 
     def save(self, result: Dict[str, Any]):
-        """Save results to a CSV file."""
-        # Check if file exists and create it if not, adding header
-        file_exists = os.path.isfile(self._file_name)
-        if not file_exists:
-            with open(self._file_name, mode='w', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow([
-                    'experiment', 'frame_number', 'image_id', 'box', 'score', 'label'
-                ])
+        for experiment, experiment_results in result.items():
+            for frame_number, image_results in experiment_results.items():
+                for image_id, results in image_results.items():
+                    for box, score, label in zip(
+                            results['boxes'].tolist(),
+                            results['scores'].tolist(),
+                            results['labels'].tolist()):
+                        self._buffer.append({
+                            'experiment': experiment,
+                            'frame_number': frame_number,
+                            'image_id': image_id,
+                            'box': box,
+                            'score': score,
+                            'label': label
+                        })
+                if len(self._buffer) >= 1000:
+                    self._write_to_file()
+        self._flush()
 
-        # Append data to the CSV file
+
+    def _write_to_file(self):
+        """Write buffered data to file."""
+        write_header = not self._file_exists
+
         with open(self._file_name, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            for experiment, experiment_results in result.items():
-                for frame_number, image_results in experiment_results.items():
-                    for image_id, results in image_results.items():
-                        for box, score, label in zip(
-                                results['boxes'].tolist(),
-                                results['scores'].tolist(),
-                                results['labels'].tolist()):
-                            writer.writerow([
-                                experiment,
-                                frame_number,
-                                image_id,
-                                box,
-                                score,
-                                label
-                            ])
+            fieldnames = ['experiment', 'frame_number', 'image_id', 'box', 'score', 'label']
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+            if write_header:
+                writer.writeheader()
+                self._file_exists = True
+
+            writer.writerows(self._buffer)
+            self._buffer.clear()  # Clear buffer after writing
+
+    def _flush(self):
+        """Manually flush remaining buffered data to file."""
+        if self._buffer:
+            self._write_to_file()
 
 class PostProcessResultSave(nn.Module):
     """ This module converts the model's output into the format expected by the ResultSaver"""

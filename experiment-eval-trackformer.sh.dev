@@ -29,6 +29,8 @@
 #----------------------------------------
 checkpoint_file=""
 output_dir=""
+timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+result_file="result_${timestamp}.csv"
 while getopts "o:c:" opt; do
   case ${opt} in
     o )
@@ -83,6 +85,7 @@ echo "SLURM_PROCID=$SLURM_PROCID"
 echo "RANK=$RANK"
 echo "output_dir=$output_dir"
 echo "checkpoint_file=$checkpoint_file"
+echo "result_file=$result_file"
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 
 seeds=(301)
@@ -104,5 +107,6 @@ for seed in "${seeds[@]}"; do
         tracking=True \
         seed=$seed \
         disable_propagate_track_query_experiment=True \
+        result_file=$result_file \
         sequence_frames=16
 done
