@@ -88,7 +88,7 @@ echo "checkpoint_file=$checkpoint_file"
 echo "result_file=$result_file"
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 
-seeds=(1730660156, 1730660157, 1730660158)
+seeds=(1730660161 1730660162 1730660163)
 
 # Loop over the seeds and run the training script
 for seed in "${seeds[@]}"; do
@@ -96,7 +96,7 @@ for seed in "${seeds[@]}"; do
     python src/train.py with \
         mot17 \
         deformable \
-        batch_size=1 \
+        batch_size=2 \
         multi_frame \
         world_size=$WORLD_SIZE \
         output_dir=$output_dir \
