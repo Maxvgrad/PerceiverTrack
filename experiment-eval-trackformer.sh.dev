@@ -30,7 +30,7 @@
 checkpoint_file=""
 output_dir=""
 timestamp=$(date +%Y-%m-%d_%H-%M-%S)
-result_file="result_${timestamp}.csv"
+result_file="result_${timestamp}"
 while getopts "o:c:" opt; do
   case ${opt} in
     o )
@@ -88,7 +88,7 @@ echo "checkpoint_file=$checkpoint_file"
 echo "result_file=$result_file"
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 
-seeds=(301)
+seeds=(1730660156, 1730660157, 1730660158)
 
 # Loop over the seeds and run the training script
 for seed in "${seeds[@]}"; do
@@ -107,6 +107,6 @@ for seed in "${seeds[@]}"; do
         tracking=True \
         seed=$seed \
         disable_propagate_track_query_experiment=True \
-        result_file=$result_file \
+        result_file="${result_file}_seed_${seed}.csv" \
         sequence_frames=16
 done
