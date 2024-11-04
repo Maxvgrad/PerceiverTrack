@@ -99,8 +99,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             sequence_start_idx = idx
             seq_len_frames = 1
 
+        is_previous_frame = random_jitter # random jitter is added to previous frames
+
         frame_keep_probs = torch.rand(seq_len_frames)
-        keep_frame_flags = (frame_keep_probs > self._frame_dropout_prob).int()
+        keep_frame_flags = ((frame_keep_probs > self._frame_dropout_prob) | is_previous_frame).int()
         imgs = []
         targets = []
         seq_name = None
