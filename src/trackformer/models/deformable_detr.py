@@ -220,8 +220,6 @@ class DeformableDETR(DETR):
                     else:
                         pos_list.append(pos_l)
 
-        print(mask_list)
-
         query_embeds = None
         if not self.two_stage:
             query_embeds = self.query_embed.weight
@@ -260,17 +258,18 @@ class DeformableDETR(DETR):
             enc_outputs_coord = enc_outputs_coord_unact.sigmoid()
             out['enc_outputs'] = {'pred_logits': enc_outputs_class, 'pred_boxes': enc_outputs_coord}
 
-        offset = 0
-        memory_slices = []
-        batch_size, _, channels = memory.shape
-        for src in src_list:
-            _, _, height, width = src.shape
-            memory_slice = memory[:, offset:offset + height * width].permute(0, 2, 1).view(
-                batch_size, channels, height, width)
-            memory_slices.append(memory_slice)
-            offset += height * width
+        if memory is not None:
+            offset = 0
+            memory_slices = []
+            batch_size, _, channels = memory.shape
+            for src in src_list:
+                _, _, height, width = src.shape
+                memory_slice = memory[:, offset:offset + height * width].permute(0, 2, 1).view(
+                    batch_size, channels, height, width)
+                memory_slices.append(memory_slice)
+                offset += height * width
 
-        memory = memory_slices
+            memory = memory_slices
         # memory = memory_slices[-1]
         # features = [NestedTensor(memory_slide) for memory_slide in memory_slices]
 
