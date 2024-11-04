@@ -95,6 +95,7 @@ srun python src/train.py with \
     deformable \
     multi_frame \
     tracking \
+    batch_size=1 \
     world_size=$WORLD_SIZE \
     output_dir=$output_dir \
     wandb_project='trackformer-drop-train' \
