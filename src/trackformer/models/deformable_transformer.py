@@ -157,25 +157,37 @@ class DeformableTransformer(nn.Module):
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # encoder
-        if self.multi_frame_attention_separate_encoder:
-            prev_memory = self.encoder(
-                src_flatten[:, :src_flatten.shape[1] // 2],
-                spatial_shapes[:self.num_feature_levels // 2],
-                valid_ratios[:, :self.num_feature_levels // 2],
-                lvl_pos_embed_flatten[:, :src_flatten.shape[1] // 2],
-                mask_flatten[:, :src_flatten.shape[1] // 2])
-            memory = self.encoder(
-                src_flatten[:, src_flatten.shape[1] // 2:],
-                spatial_shapes[self.num_feature_levels // 2:],
-                valid_ratios[:, self.num_feature_levels // 2:],
-                lvl_pos_embed_flatten[:, src_flatten.shape[1] // 2:],
-                mask_flatten[:, src_flatten.shape[1] // 2:])
-            memory = torch.cat([memory, prev_memory], 1)
+        print(mask_flatten.shape)
+        if not mask_flatten.all(): # check not all mask is ones
+            if self.multi_frame_attention_separate_encoder:
+                prev_memory = self.encoder(
+                    src_flatten[:, :src_flatten.shape[1] // 2],
+                    spatial_shapes[:self.num_feature_levels // 2],
+                    valid_ratios[:, :self.num_feature_levels // 2],
+                    lvl_pos_embed_flatten[:, :src_flatten.shape[1] // 2],
+                    mask_flatten[:, :src_flatten.shape[1] // 2])
+                memory = self.encoder(
+                    src_flatten[:, src_flatten.shape[1] // 2:],
+                    spatial_shapes[self.num_feature_levels // 2:],
+                    valid_ratios[:, self.num_feature_levels // 2:],
+                    lvl_pos_embed_flatten[:, src_flatten.shape[1] // 2:],
+                    mask_flatten[:, src_flatten.shape[1] // 2:])
+                memory = torch.cat([memory, prev_memory], 1)
+            else:
+                memory = self.encoder(src_flatten, spatial_shapes, valid_ratios, lvl_pos_embed_flatten, mask_flatten)
+
         else:
-            memory = self.encoder(src_flatten, spatial_shapes, valid_ratios, lvl_pos_embed_flatten, mask_flatten)
+            print("Bypass encoder")
+            memory = None
 
         # prepare input for decoder
-        bs, _, c = memory.shape
+
+        bs, c, *_ = srcs[0].shape
+        if memory is not None:
+            bs_m, _, c_m = memory.shape
+            assert bs == bs_m
+            assert c == c_m
+
         query_attn_mask = None
         if self.two_stage:
             output_memory, output_proposals = self.gen_encoder_output_proposals(memory, mask_flatten, spatial_shapes)
@@ -370,20 +382,16 @@ class DeformableTransformerDecoderLayer(nn.Module):
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
 
-        # cross attention
-        tgt2 = self.cross_attn(self.with_pos_embed(tgt, query_pos),
-                               reference_points,
-                               src, src_spatial_shapes, src_padding_mask, query_attn_mask)
+        if src is not None:
+            # cross attention
+            tgt2 = self.cross_attn(self.with_pos_embed(tgt, query_pos),
+                                   reference_points,
+                                   src, src_spatial_shapes, src_padding_mask, query_attn_mask)
 
-        if src_padding_mask is not None:
-            # Check which rows (batch-wise) have all elements equal to 1 (fully masked)
-            # mask_all_ones will be a [batch_size] tensor of True/False
-            mask_all_ones = src_padding_mask.view(src_padding_mask.size(0), -1).all(dim=1)
-
-            mask_all_ones = mask_all_ones.view(-1, 1, 1)
-
-            # Zero out the corresponding rows in tgt2
-            tgt2 = tgt2.masked_fill(mask_all_ones, float(0))
+        else:
+            # src_padding_mask has all ones (fully masked) so bypass cross attention
+            print("bypass cross attention")
+            tgt2 = torch.zeros_like(tgt).to(tgt.device)
 
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
