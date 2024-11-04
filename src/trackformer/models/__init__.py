@@ -16,6 +16,7 @@ from .matcher import build_matcher
 from .perceiver_detection import build_model as build_model_perceiver_detection
 from .perceiver_tracking import PerceiverTracking
 from .transformer import build_transformer
+from ..result_saver import PostProcessResultSave
 
 
 def build_model(args):
@@ -62,6 +63,9 @@ def build_model(args):
         if args.dataset == "coco_panoptic":
             is_thing_map = {i: i <= 90 for i in range(201)}
             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
+
+    if args.eval_only:
+        postprocessors["result_saver"] = PostProcessResultSave()
 
     if hasattr(args, 'model') and args.model == 'perceiver':
         model = build_model_perceiver_based(args, matcher, num_classes, postprocessors)
