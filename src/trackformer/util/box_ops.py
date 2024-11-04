@@ -46,6 +46,29 @@ def generalized_box_iou(boxes1, boxes2):
     Returns a [N, M] pairwise matrix, where N = len(boxes1)
     and M = len(boxes2)
     """
+
+    print("boxes1:", boxes1)
+    print("boxes2:", boxes2)
+    print("boxes1 shape:", boxes1.shape)
+    print("boxes2 shape:", boxes2.shape)
+
+    # Check if the coordinates are valid
+    boxes1_check = boxes1[:, 2:] >= boxes1[:, :2]
+    boxes2_check = boxes2[:, 2:] >= boxes2[:, :2]
+
+    # Print the checks
+    print("boxes1_check (x1, y1 >= x0, y0):", boxes1_check)
+    print("boxes2_check (x1, y1 >= x0, y0):", boxes2_check)
+
+    # Find and print invalid boxes in boxes1 and boxes2
+    if not boxes1_check.all():
+        invalid_boxes1 = boxes1[~boxes1_check.all(dim=1)]
+        print("Invalid boxes in boxes1:", invalid_boxes1)
+
+    if not boxes2_check.all():
+        invalid_boxes2 = boxes2[~boxes2_check.all(dim=1)]
+        print("Invalid boxes in boxes2:", invalid_boxes2)
+
     # degenerate boxes gives inf / nan results
     # so do an early check
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
