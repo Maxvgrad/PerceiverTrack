@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 
 from ..util import box_ops
+from ..util.box_ops import box_cxcywh_to_xyxy
 from ..util.misc import NestedTensor, get_rank
 from .deformable_detr import DeformableDETR
 from .detr import DETR
@@ -259,7 +260,7 @@ class DETRTrackingBase(nn.Module):
                     prev_outputs_without_aux = {
                         k: v for k, v in prev_out.items() if 'aux_outputs' not in k}
 
-                    boxes1 = prev_outputs_without_aux["pred_boxes"].flatten(0, 1)
+                    boxes1 = box_cxcywh_to_xyxy(prev_outputs_without_aux["pred_boxes"].flatten(0, 1))
 
                     # Check if the coordinates are valid
                     boxes1_check = boxes1[:, 2:] >= boxes1[:, :2]
