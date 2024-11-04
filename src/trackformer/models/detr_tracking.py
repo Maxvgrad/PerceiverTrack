@@ -281,6 +281,7 @@ class DETRTrackingBase(nn.Module):
             if not keep_frame:  # If the frame should be dropped
                 img.zero_()
                 m.fill_(True)
+                prev_features = None
 
         out, targets, features, memory, hs  = super().forward(samples, targets, prev_features)
 
