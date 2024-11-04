@@ -93,7 +93,7 @@ class DETRTrackingBase(nn.Module):
             target['track_query_match_ids'] = target_ind_matched_idx
 
             # random false positives
-            if add_false_pos:
+            if add_false_pos and self._track_query_false_positive_prob:
                 prev_boxes_matched = prev_out['pred_boxes'][i, prev_out_ind[target_ind_matching]]
 
                 not_prev_out_ind = torch.arange(prev_out['pred_boxes'].shape[1])
@@ -274,6 +274,12 @@ class DETRTrackingBase(nn.Module):
                     target['track_queries_fal_pos_mask'] = torch.zeros(self.num_queries).bool().to(device)
                     target['track_query_boxes'] = torch.zeros(0, 4).to(device)
                     target['track_query_match_ids'] = torch.tensor([]).long().to(device)
+
+        frame_keep_mask = [t['keep_frame'] for t in targets]
+        for keep_frame, img, m in zip(frame_keep_mask, samples.tensors, samples.mask):
+            if not keep_frame:  # If the frame should be dropped
+                img[:, :, :] = 0  # Zero out the entire image
+                m[:, :] = True  # Set the mask to True, marking the frame as dropped
 
         out, targets, features, memory, hs  = super().forward(samples, targets, prev_features)
 
