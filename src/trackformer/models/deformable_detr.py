@@ -220,6 +220,8 @@ class DeformableDETR(DETR):
                     else:
                         pos_list.append(pos_l)
 
+        print(mask_list)
+
         query_embeds = None
         if not self.two_stage:
             query_embeds = self.query_embed.weight

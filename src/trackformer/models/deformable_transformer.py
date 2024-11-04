@@ -157,7 +157,9 @@ class DeformableTransformer(nn.Module):
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # encoder
+        print("mask_flatten")
         print(mask_flatten.shape)
+        print(mask_flatten)
         if not mask_flatten.all(): # check not all mask is ones
             if self.multi_frame_attention_separate_encoder:
                 prev_memory = self.encoder(
