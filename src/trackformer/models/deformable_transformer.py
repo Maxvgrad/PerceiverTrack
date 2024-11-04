@@ -157,9 +157,6 @@ class DeformableTransformer(nn.Module):
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # encoder
-        print("mask_flatten")
-        print(mask_flatten.shape)
-        print(mask_flatten)
         if not mask_flatten.all(): # check not all mask is ones
             if self.multi_frame_attention_separate_encoder:
                 prev_memory = self.encoder(
@@ -179,13 +176,13 @@ class DeformableTransformer(nn.Module):
                 memory = self.encoder(src_flatten, spatial_shapes, valid_ratios, lvl_pos_embed_flatten, mask_flatten)
 
         else:
-            print("Bypass encoder")
             memory = None
 
         # prepare input for decoder
 
         bs, c, *_ = srcs[0].shape
         if memory is not None:
+            # sense check
             bs_m, _, c_m = memory.shape
             assert bs == bs_m
             assert c == c_m
@@ -392,7 +389,6 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
         else:
             # src_padding_mask has all ones (fully masked) so bypass cross attention
-            print("bypass cross attention")
             tgt2 = torch.zeros_like(tgt).to(tgt.device)
 
         tgt = tgt + self.dropout1(tgt2)

@@ -138,10 +138,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
             k: v * weight_dict[k] for k, v in loss_dict_reduced.items() if k in weight_dict}
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
 
-        print(f'loss_dict_reduced_unscaled: {loss_dict_reduced_unscaled}')
-        print(f'loss_dict_reduced_scaled: {loss_dict_reduced_scaled}')
-        print(f'losses_reduced_scaled: {losses_reduced_scaled}')
-
         loss_value = losses_reduced_scaled.item()
 
         if not math.isfinite(loss_value):

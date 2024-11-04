@@ -259,20 +259,6 @@ class DETRTrackingBase(nn.Module):
                     # prev_out = {k: v.detach() for k, v in prev_out.items() if torch.is_tensor(v)}
                     prev_outputs_without_aux = {
                         k: v for k, v in prev_out.items() if 'aux_outputs' not in k}
-
-                    boxes1 = box_cxcywh_to_xyxy(prev_outputs_without_aux["pred_boxes"].flatten(0, 1))
-
-                    # Check if the coordinates are valid
-                    boxes1_check = boxes1[:, 2:] >= boxes1[:, :2]
-
-                    # Find and print invalid boxes in boxes1 and boxes2
-                    if not boxes1_check.all():
-                        invalid_boxes1 = boxes1[~boxes1_check.all(dim=1)]
-                        print("boxes1_check (x1, y1 >= x0, y0):", boxes1_check)
-                        print("Invalid boxes in boxes1:", invalid_boxes1)
-                        print("Targets:", targets)
-
-
                     prev_indices = self._matcher(prev_outputs_without_aux, prev_targets)
 
                     self.add_track_queries_to_targets(targets, prev_indices, prev_out)
@@ -290,18 +276,11 @@ class DETRTrackingBase(nn.Module):
                     target['track_query_match_ids'] = torch.tensor([]).long().to(device)
 
         frame_keep_mask = [t['keep_frame'] for t in targets]
-        print('===')
-        print(f'frame_keep_mask {frame_keep_mask}')
 
         for keep_frame, img, m in zip(frame_keep_mask, samples.tensors, samples.mask):
             if not keep_frame:  # If the frame should be dropped
-                print(f'not keep_frame: {keep_frame}')
-                img[:, :, :] = 0  # Zero out the entire image
-                m[:, :] = True  # Set the mask to True, marking the frame as dropped
-
+                img.zero_()
                 m.fill_(True)
-
-                print(f'all: {m.all()}')
 
         out, targets, features, memory, hs  = super().forward(samples, targets, prev_features)
 
