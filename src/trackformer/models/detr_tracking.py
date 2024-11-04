@@ -290,8 +290,12 @@ class DETRTrackingBase(nn.Module):
                     target['track_query_match_ids'] = torch.tensor([]).long().to(device)
 
         frame_keep_mask = [t['keep_frame'] for t in targets]
+        print('===')
+        print(f'frame_keep_mask {frame_keep_mask}')
+
         for keep_frame, img, m in zip(frame_keep_mask, samples.tensors, samples.mask):
             if not keep_frame:  # If the frame should be dropped
+                print(f'not keep_frame: {keep_frame}')
                 img[:, :, :] = 0  # Zero out the entire image
                 m[:, :] = True  # Set the mask to True, marking the frame as dropped
 
