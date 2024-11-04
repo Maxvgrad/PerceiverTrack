@@ -28,7 +28,7 @@
 # Parse Arguments
 #----------------------------------------
 wandb_id=None
-resume_optim=false
+resume_optim=False
 resume=""  # No resume
 timestamp=$(date +%Y-%m-%d_%H-%M-%S)
 output_dir="not_tracked_dir/output_${model_name}_${timestamp}"
@@ -42,7 +42,7 @@ while getopts "r:wid:ro:o" opt; do
       resume=$OPTARG
       ;;
     ro )
-      resume_optim=true
+      resume_optim=True
       ;;
     wid )
       wandb_id=$OPTARG
@@ -101,7 +101,7 @@ srun python src/train.py with \
     track_query_false_negative_prob=0 \
     track_query_false_positive_prob=0 \
     frame_dropout_prob=0.3 \
-    tracking_eval=false \
+    tracking_eval=False \
     wandb_id="$wandb_id" \
     resume_optim="$resume_optim" \
     resume="$resume"
