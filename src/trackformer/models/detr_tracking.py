@@ -256,9 +256,22 @@ class DETRTrackingBase(nn.Module):
                         prev_out, _, prev_features, _, _ = super().forward([t['prev_image'] for t in targets])
 
                     # prev_out = {k: v.detach() for k, v in prev_out.items() if torch.is_tensor(v)}
-
                     prev_outputs_without_aux = {
                         k: v for k, v in prev_out.items() if 'aux_outputs' not in k}
+
+                    boxes1 = prev_outputs_without_aux['pred_boxes']
+
+                    # Check if the coordinates are valid
+                    boxes1_check = boxes1[:, 2:] >= boxes1[:, :2]
+
+                    # Find and print invalid boxes in boxes1 and boxes2
+                    if not boxes1_check.all():
+                        invalid_boxes1 = boxes1[~boxes1_check.all(dim=1)]
+                        print("boxes1_check (x1, y1 >= x0, y0):", boxes1_check)
+                        print("Invalid boxes in boxes1:", invalid_boxes1)
+                        print("Targets:", targets)
+
+
                     prev_indices = self._matcher(prev_outputs_without_aux, prev_targets)
 
                     self.add_track_queries_to_targets(targets, prev_indices, prev_out)
