@@ -299,7 +299,9 @@ class DETRTrackingBase(nn.Module):
                 img[:, :, :] = 0  # Zero out the entire image
                 m[:, :] = True  # Set the mask to True, marking the frame as dropped
 
-                print(samples)
+                m.fill_(True)
+
+                print(f'all: {m.all()}')
 
         out, targets, features, memory, hs  = super().forward(samples, targets, prev_features)
 
