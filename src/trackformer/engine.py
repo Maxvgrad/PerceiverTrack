@@ -195,7 +195,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     result_saver = None
     if 'result_saver' in postprocessors.keys():
-        result_saver = ResultSaver(file_name=os.path.join(output_dir, args.result_file))
+        result_saver = ResultSaver(file_name=os.path.join(output_dir, args.result_file),
+                                   increment_class_label=args.decrement_person_label_after_loading_into_memory)
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():

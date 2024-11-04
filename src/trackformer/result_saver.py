@@ -10,11 +10,13 @@ from trackformer.util import box_ops
 
 class ResultSaver:
 
-    def __init__(self, file_name):
+    def __init__(self, file_name, increment_class_label=False):
         self._file_name = file_name
         assert file_name.endswith('.csv'), "File must be a .csv file"
         self._file_exists = os.path.isfile(self._file_name)
         self._buffer = []
+        self._increment_class_label = increment_class_label
+        print(f'Result saver increments label {self._increment_class_label}')
 
     def save(self, result: Dict[str, Any]):
         for experiment, experiment_results in result.items():
@@ -24,6 +26,10 @@ class ResultSaver:
                             results['boxes'].tolist(),
                             results['scores'].tolist(),
                             results['labels'].tolist()):
+
+                        if self._increment_class_label:
+                            label += 1
+
                         self._buffer.append({
                             'experiment': experiment,
                             'frame_number': frame_number,
