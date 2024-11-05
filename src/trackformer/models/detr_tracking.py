@@ -279,6 +279,7 @@ class DETRTrackingBase(nn.Module):
 
         for keep_frame, img, m in zip(frame_keep_mask, samples.tensors, samples.mask):
             if not keep_frame:  # If the frame should be dropped
+                print('Drop frame')
                 img.zero_()
                 m.fill_(True)
                 prev_features = None
