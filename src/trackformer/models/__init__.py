@@ -64,7 +64,8 @@ def build_model(args):
             is_thing_map = {i: i <= 90 for i in range(201)}
             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
 
-    if args.eval_only:
+    if args.eval_only and args.result_file:
+        print('Add result saver post processor.')
         postprocessors["result_saver"] = PostProcessResultSave()
 
     if hasattr(args, 'model') and args.model == 'perceiver':
