@@ -72,21 +72,6 @@ class HungarianMatcher(nn.Module):
         else:
             out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)
 
-        thresholds = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-        previous = 0
-        threshold_th = 0
-        for threshold in thresholds:
-            count_below_threshold = (out_prob[:, 0] <= threshold).sum().item()
-            print(f"Number PERSON of probabilities {threshold_th} < X <= {threshold}: {count_below_threshold - previous}")
-            previous = count_below_threshold
-            threshold_th = threshold
-
-            count_below_threshold = (out_prob[:, 1:] <= threshold).sum().item()
-            print(f"Number REST of probabilities {threshold_th} < X <= {threshold}: {count_below_threshold - previous}")
-            previous = count_below_threshold
-            threshold_th = threshold
-
         # [batch_size * num_queries, 4]
         out_bbox = outputs["pred_boxes"].flatten(0, 1)
 
