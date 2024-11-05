@@ -77,8 +77,13 @@ class HungarianMatcher(nn.Module):
         previous = 0
         threshold_th = 0
         for threshold in thresholds:
-            count_below_threshold = (out_prob <= threshold).sum().item()
-            print(f"Number of probabilities {threshold_th} < X <= {threshold}: {count_below_threshold - previous}")
+            count_below_threshold = (out_prob[:, 0] <= threshold).sum().item()
+            print(f"Number PERSON of probabilities {threshold_th} < X <= {threshold}: {count_below_threshold - previous}")
+            previous = count_below_threshold
+            threshold_th = threshold
+
+            count_below_threshold = (out_prob[:, 1:] <= threshold).sum().item()
+            print(f"Number REST of probabilities {threshold_th} < X <= {threshold}: {count_below_threshold - previous}")
             previous = count_below_threshold
             threshold_th = threshold
 
