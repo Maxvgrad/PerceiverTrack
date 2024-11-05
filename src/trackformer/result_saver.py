@@ -74,7 +74,12 @@ class PostProcessResultSave(nn.Module):
     def forward(self, outputs, targets):
         target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         results_orig = self._bbox_postprocessor(outputs, target_sizes)
-        experiment_results = self.partition_by_experiment_and_timestamp(results_orig, targets)
+
+        if 'experiment' in targets[-1]:
+            experiment_results = self.partition_by_experiment_and_timestamp(results_orig, targets)
+        else:
+            experiment_results = self.partition(results_orig, targets)
+
         return experiment_results
 
     def partition_by_experiment_and_timestamp(self, results_orig, targets):
@@ -87,6 +92,31 @@ class PostProcessResultSave(nn.Module):
 
             experiment_result_dict = result[experiment]
             timestamp = target['timestamp'].item()
+            image_id = target['image_id'].item()
+
+            if timestamp in experiment_result_dict:
+                if image_id in experiment_result_dict[timestamp]:
+                    print(
+                        f'Warn overriding results for experiment {experiment} '
+                        f'timestamp {timestamp} image id {image_id}'
+                    )
+                experiment_result_dict[timestamp][image_id] = output
+            else:
+                experiment_result_dict[timestamp] = {
+                    image_id: output
+                }
+        return result
+
+    def partition(self, results_orig, targets):
+        result = {}
+        for target, output in zip(targets, results_orig):
+            experiment = 'default'
+
+            if experiment not in result:
+                result[experiment] = {}
+
+            experiment_result_dict = result[experiment]
+            timestamp = 0
             image_id = target['image_id'].item()
 
             if timestamp in experiment_result_dict:
