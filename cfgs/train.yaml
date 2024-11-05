@@ -161,3 +161,4 @@ vis_and_log_interval: 50
 no_vis: false
 
 decrement_person_label_after_loading_into_memory: false
+detection_nms_thresh: 0.9

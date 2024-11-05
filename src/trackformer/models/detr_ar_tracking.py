@@ -17,6 +17,7 @@ class DETRArTrackingBase(nn.Module):
                  track_obj_score_threshold: float = 0.4,
                  max_num_of_frames_lookback: int = 0,
                  disable_propagate_track_query_experiment: bool = False,
+                 detection_nms_thresh: float = 0.5,
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
@@ -24,7 +25,7 @@ class DETRArTrackingBase(nn.Module):
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
         self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
-        self.detection_nms_thresh = 0.9
+        self.detection_nms_thresh = detection_nms_thresh
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()

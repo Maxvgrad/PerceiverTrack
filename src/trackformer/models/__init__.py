@@ -176,6 +176,7 @@ def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
                     tracking_kwargs['obj_detector_post'] = obj_detector_post
                     tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
                     tracking_kwargs['disable_propagate_track_query_experiment'] = args.disable_propagate_track_query_experiment
+                    tracking_kwargs['detection_nms_thresh'] = args.detection_nms_thresh
 
                     model = DeformableDETRArTracking(tracking_kwargs, detr_kwargs)
                 else:
