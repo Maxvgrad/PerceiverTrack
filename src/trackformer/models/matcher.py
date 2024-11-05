@@ -101,7 +101,22 @@ class HungarianMatcher(nn.Module):
         cost_matrix = self.cost_bbox * cost_bbox \
             + self.cost_class * cost_class \
             + self.cost_giou * cost_giou
-        cost_matrix = cost_matrix.view(batch_size, num_queries, -1).cpu()
+        try:
+            cost_matrix = cost_matrix.view(batch_size, num_queries, -1).cpu()
+        except RuntimeError as e:
+            # Print debugging information only if there's an error
+            print("Error encountered during reshaping:", e)
+            print("Expected shape:", (batch_size, num_queries, -1))
+            print("Actual cost_matrix shape:", cost_matrix.shape)
+            print("out_prob shape:", out_prob.shape)
+            print("out_bbox shape:", out_bbox.shape)
+            print("tgt_ids shape:", tgt_ids.shape)
+            print("tgt_bbox shape:", tgt_bbox.shape)
+            print("cost_class shape:", cost_class.shape)
+            print("cost_bbox shape:", cost_bbox.shape)
+            print("cost_giou shape:", cost_giou.shape)
+            raise  # Re-raise the error to halt execution if desired
+
 
         sizes = [len(v["boxes"]) for v in targets]
 
