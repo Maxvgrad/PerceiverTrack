@@ -49,6 +49,7 @@ class DETRArTrackingBase(nn.Module):
             has_ground_truth = 'boxes' in current_targets_base[0]
 
             if self.training:
+                print(f"Training timestamp {timestamp}") # sense check
                 frame_keep_mask = [t['keep_frame'] for t in current_targets_base]
 
                 batch = nested_tensor_from_tensor_list(batch)
@@ -73,74 +74,74 @@ class DETRArTrackingBase(nn.Module):
                         device, current_targets_base, out_no_track_query_prop, result,
                         targets_flat, timestamp, 'no_track_query_propagation'
                     )
-
-            current_targets_baseline = current_targets_base
-            # Experiment: Baseline
-            if out_baseline:
-                # Populate a previous hidden state
-                current_targets_baseline = self.populate_targets_with_query_hs_and_reference_boxes(
-                    current_targets_base, out_baseline)
-
-            out_baseline, targets_resp, features, memory, hs = super().forward(
-                samples=batch, targets=current_targets_baseline
-            )
-
-            out_baseline = self.filter_output_result(
-                orig_size, out_baseline, self.get_number_of_prev_track_queries(current_targets_baseline))
-
-            if has_ground_truth:
-                # If we have a ground truth for this timestamp
-                self.populate_results(
-                    device, current_targets_baseline, out_baseline, result, targets_flat, timestamp, 'baseline'
-                )
-
-            # Evaluation experiments
-            if not self.training:
-
-                # Experiment: blind
-                if timestamp > 0:
-                    current_targets_blind = current_targets_base
-
-                    # Experiment where the model is supposed to receive input at every timestamp.
-                    # We assume the input is not available, so we feed a zero image as input.
-                    # This allows us to evaluate how well the model can predict a new object position without actual input.
-                    zero_batch = torch.zeros_like(batch)
-                    zero_samples = nested_tensor_from_tensor_list(zero_batch)
-                    zero_mask = torch.ones(zero_samples.mask.shape, dtype=torch.bool, device=device)
-                    zero_samples = NestedTensor(zero_samples.tensors, zero_mask)
-
-                    if out_blind:
-                        current_targets_blind = self.populate_targets_with_query_hs_and_reference_boxes(
-                            current_targets_blind, out_blind)
-
-                    out_blind, *_ = super().forward(
-                        samples=zero_samples, targets=current_targets_blind
-                    )
-
-                    out_blind = self.filter_output_result(
-                        orig_size, out_blind, self.get_number_of_prev_track_queries(current_targets_blind))
-
-                    if has_ground_truth:
-                        self.populate_results(
-                            device, current_targets_blind, out_blind, result, targets_flat, timestamp,
-                            'blind'
-                        )
-
-                    # Experiment: gap
-                    if timestamp > 1 and has_ground_truth:
-                        # Experiment to evaluate how well the model can predict an object's position after a time gap
-                        # where the input was either skipped or replaced with zero images due to missing data.
-                        out_gap, *_ = super().forward(
-                            samples=batch, targets=current_targets_blind
-                        )
-
-                        out_gap = self.filter_output_result(
-                            orig_size, out_gap, self.get_number_of_prev_track_queries(current_targets_blind))
-
-                        self.populate_results(
-                            device, current_targets_blind, out_gap, result, targets_flat, timestamp,
-                            'gap'
-                        )
+            #
+            # current_targets_baseline = current_targets_base
+            # # Experiment: Baseline
+            # if out_baseline:
+            #     # Populate a previous hidden state
+            #     current_targets_baseline = self.populate_targets_with_query_hs_and_reference_boxes(
+            #         current_targets_base, out_baseline)
+            #
+            # out_baseline, targets_resp, features, memory, hs = super().forward(
+            #     samples=batch, targets=current_targets_baseline
+            # )
+            #
+            # out_baseline = self.filter_output_result(
+            #     orig_size, out_baseline, self.get_number_of_prev_track_queries(current_targets_baseline))
+            #
+            # if has_ground_truth:
+            #     # If we have a ground truth for this timestamp
+            #     self.populate_results(
+            #         device, current_targets_baseline, out_baseline, result, targets_flat, timestamp, 'baseline'
+            #     )
+            #
+            # # Evaluation experiments
+            # if not self.training:
+            #
+            #     # Experiment: blind
+            #     if timestamp > 0:
+            #         current_targets_blind = current_targets_base
+            #
+            #         # Experiment where the model is supposed to receive input at every timestamp.
+            #         # We assume the input is not available, so we feed a zero image as input.
+            #         # This allows us to evaluate how well the model can predict a new object position without actual input.
+            #         zero_batch = torch.zeros_like(batch)
+            #         zero_samples = nested_tensor_from_tensor_list(zero_batch)
+            #         zero_mask = torch.ones(zero_samples.mask.shape, dtype=torch.bool, device=device)
+            #         zero_samples = NestedTensor(zero_samples.tensors, zero_mask)
+            #
+            #         if out_blind:
+            #             current_targets_blind = self.populate_targets_with_query_hs_and_reference_boxes(
+            #                 current_targets_blind, out_blind)
+            #
+            #         out_blind, *_ = super().forward(
+            #             samples=zero_samples, targets=current_targets_blind
+            #         )
+            #
+            #         out_blind = self.filter_output_result(
+            #             orig_size, out_blind, self.get_number_of_prev_track_queries(current_targets_blind))
+            #
+            #         if has_ground_truth:
+            #             self.populate_results(
+            #                 device, current_targets_blind, out_blind, result, targets_flat, timestamp,
+            #                 'blind'
+            #             )
+            #
+            #         # Experiment: gap
+            #         if timestamp > 1 and has_ground_truth:
+            #             # Experiment to evaluate how well the model can predict an object's position after a time gap
+            #             # where the input was either skipped or replaced with zero images due to missing data.
+            #             out_gap, *_ = super().forward(
+            #                 samples=batch, targets=current_targets_blind
+            #             )
+            #
+            #             out_gap = self.filter_output_result(
+            #                 orig_size, out_gap, self.get_number_of_prev_track_queries(current_targets_blind))
+            #
+            #             self.populate_results(
+            #                 device, current_targets_blind, out_gap, result, targets_flat, timestamp,
+            #                 'gap'
+            #             )
 
         result = self.pad_and_stack_results(result)
         return result, targets_flat
@@ -213,6 +214,9 @@ class DETRArTrackingBase(nn.Module):
         filtered_output['nms_deltas'] = []
         for i, post_process_result in enumerate(post_process_results):
             number_previous_track_queries = numbers_previous_track_queries[i]
+
+            print(f'number_previous_track_queries: {number_previous_track_queries}')
+
             previous_track_scores = post_process_result['scores'][:number_previous_track_queries]
             previous_track_labels = post_process_result['labels'][:number_previous_track_queries]
             previous_boxes = post_process_result['boxes'][:number_previous_track_queries]
@@ -223,6 +227,9 @@ class DETRArTrackingBase(nn.Module):
             )
 
             previous_keep_count = previous_track_keep.sum().item()
+
+            print(f'previous_keep_count: {previous_keep_count}')
+
 
             previous_track_boxes = output['pred_boxes'][i][:number_previous_track_queries][previous_track_keep]
             previous_track_pred_logits = output['pred_logits'][i][:number_previous_track_queries][previous_track_keep]
@@ -245,6 +252,8 @@ class DETRArTrackingBase(nn.Module):
 
             new_keep_count = new_track_keep.sum().item()
 
+            print(f'new_keep_count: {new_keep_count}')
+
             new_track_boxes = output['pred_boxes'][i][-self.num_queries:][new_track_keep]
             new_track_pred_logits = output['pred_logits'][i][-self.num_queries:][new_track_keep]
             new_hs_embed = output['hs_embed'][i][-self.num_queries:][new_track_keep]
@@ -261,6 +270,9 @@ class DETRArTrackingBase(nn.Module):
             keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
 
             after_nms_count = keep.shape[0]
+
+            print(f'after_nms_count: {after_nms_count}')
+            print(f'nms_deltas: {(previous_keep_count + new_keep_count) - after_nms_count}')
 
             filtered_output['nms_deltas'].append(
                 torch.tensor((previous_keep_count + new_keep_count) - after_nms_count, dtype=torch.float32)
