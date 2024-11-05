@@ -43,9 +43,6 @@ class CocoEvaluator(object):
             for prediction in predictions.values():
                 prediction["labels"] += 1
 
-        print("predictions")
-        print(predictions)
-
         for iou_type in self.iou_types:
             results = self.prepare(predictions, iou_type)
 

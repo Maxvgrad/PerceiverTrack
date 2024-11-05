@@ -66,7 +66,7 @@ def build_model(args):
 
     if args.eval_only and args.result_file:
         print('Add result saver post processor.')
-        postprocessors["result_saver"] = PostProcessResultSave()
+        postprocessors["result_saver"] = PostProcessResultSave(bbox_postprocessor=postprocessors['bbox'])
 
     if hasattr(args, 'model') and args.model == 'perceiver':
         model = build_model_perceiver_based(args, matcher, num_classes, postprocessors)
