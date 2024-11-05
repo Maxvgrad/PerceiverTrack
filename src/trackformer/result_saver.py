@@ -67,6 +67,7 @@ class PostProcessResultSave(nn.Module):
     """ This module converts the model's output into the format expected by the ResultSaver"""
 
     def __init__(self, bbox_postprocessor):
+        super().__init__()
         self._bbox_postprocessor = bbox_postprocessor
 
     @torch.no_grad()
