@@ -217,10 +217,7 @@ class DETRArTrackingBase(nn.Module):
             previous_track_labels = post_process_result['labels'][:number_previous_track_queries]
             previous_boxes = post_process_result['boxes'][:number_previous_track_queries]
 
-            previous_track_keep = torch.logical_and(
-                previous_track_scores > self._track_obj_score_threshold,
-                previous_track_labels == self._label_person
-            )
+            previous_track_keep = previous_track_labels == self._label_person
 
             previous_keep_count = previous_track_keep.sum().item()
 
@@ -228,20 +225,18 @@ class DETRArTrackingBase(nn.Module):
             previous_track_pred_logits = output['pred_logits'][i][:number_previous_track_queries][previous_track_keep]
             previous_hs_embed = output['hs_embed'][i][:number_previous_track_queries][previous_track_keep]
             previous_track_scores = torch.zeros_like(previous_track_scores[previous_track_keep])
-            previous_track_scores.fill_(float('inf'))
+
+            real_previous_track_scores = previous_track_scores[previous_track_keep]
+            previous_track_scores = torch.full_like(real_previous_track_scores, float('inf'))
             assert torch.all(previous_track_scores == float('inf'))
+
             previous_boxes = previous_boxes[previous_track_keep]
 
             new_track_scores = post_process_result['scores'][-self.num_queries:]
             new_boxes = post_process_result['boxes'][-self.num_queries:]
             new_track_labels = post_process_result['labels'][-self.num_queries:]
 
-            number_new_tracks = new_track_scores.shape[0]
-
-            new_track_keep = torch.logical_and(
-                new_track_scores > self._track_obj_score_threshold,
-                new_track_labels == self._label_person
-            )
+            new_track_keep = new_track_labels == self._label_person
 
             new_keep_count = new_track_keep.sum().item()
 
@@ -261,6 +256,12 @@ class DETRArTrackingBase(nn.Module):
             keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
 
             after_nms_count = keep.shape[0]
+
+            if after_nms_count > 100:
+                # Sort and keep indices of the top 100 scores
+                real_track_scores = torch.cat([real_previous_track_scores, new_track_scores])
+                top100_idx = real_track_scores[keep].topk(100).indices
+                keep = keep[top100_idx]
 
             filtered_output['nms_deltas'].append(
                 torch.tensor((previous_keep_count + new_keep_count) - after_nms_count, dtype=torch.float32)
