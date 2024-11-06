@@ -224,11 +224,10 @@ class DETRArTrackingBase(nn.Module):
             previous_track_boxes = output['pred_boxes'][i][:number_previous_track_queries][previous_track_keep]
             previous_track_pred_logits = output['pred_logits'][i][:number_previous_track_queries][previous_track_keep]
             previous_hs_embed = output['hs_embed'][i][:number_previous_track_queries][previous_track_keep]
-            previous_track_scores = torch.zeros_like(previous_track_scores[previous_track_keep])
 
-            real_previous_track_scores = previous_track_scores[previous_track_keep]
-            previous_track_scores = torch.full_like(real_previous_track_scores, float('inf'))
-            assert torch.all(previous_track_scores == float('inf'))
+            previous_track_scores = previous_track_scores[previous_track_keep]
+            previous_track_scores_inf = torch.full_like(previous_track_scores, float('inf'))
+            assert torch.all(previous_track_scores_inf == float('inf'))
 
             previous_boxes = previous_boxes[previous_track_keep]
 
@@ -251,15 +250,14 @@ class DETRArTrackingBase(nn.Module):
             logits = torch.cat([previous_track_pred_logits, new_track_pred_logits])
             hs_embeds = torch.cat([previous_hs_embed, new_hs_embed])
 
-            track_scores = torch.cat([previous_track_scores, new_track_scores])
-
+            track_scores = torch.cat([previous_track_scores_inf, new_track_scores])
             keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
 
             after_nms_count = keep.shape[0]
 
             if after_nms_count > 100:
                 # Sort and keep indices of the top 100 scores
-                real_track_scores = torch.cat([real_previous_track_scores, new_track_scores])
+                real_track_scores = torch.cat([previous_track_scores, new_track_scores])
                 top100_idx = real_track_scores[keep].topk(100).indices
                 keep = keep[top100_idx]
 
