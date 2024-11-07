@@ -14,7 +14,7 @@ class DETRArTrackingBase(nn.Module):
 
     def __init__(self,
                  obj_detector_post,
-                 track_obj_score_threshold: float = 0.4,
+                 track_obj_score_threshold: float = -1.0,
                  max_num_of_frames_lookback: int = 0,
                  disable_propagate_track_query_experiment: bool = False,
                  detection_nms_thresh: float = 0.5,
@@ -217,7 +217,10 @@ class DETRArTrackingBase(nn.Module):
             previous_track_labels = post_process_result['labels'][:number_previous_track_queries]
             previous_boxes = post_process_result['boxes'][:number_previous_track_queries]
 
-            previous_track_keep = previous_track_labels == self._label_person
+            previous_track_keep = torch.logical_and(
+                previous_track_scores > self._track_obj_score_threshold,
+                previous_track_labels == self._label_person
+            )
 
             previous_keep_count = previous_track_keep.sum().item()
 
@@ -235,7 +238,10 @@ class DETRArTrackingBase(nn.Module):
             new_boxes = post_process_result['boxes'][-self.num_queries:]
             new_track_labels = post_process_result['labels'][-self.num_queries:]
 
-            new_track_keep = new_track_labels == self._label_person
+            new_track_keep = torch.logical_and(
+                new_track_scores > self._track_obj_score_threshold,
+                new_track_labels == self._label_person
+            )
 
             new_keep_count = new_track_keep.sum().item()
 

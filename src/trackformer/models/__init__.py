@@ -127,7 +127,7 @@ def build_model_perceiver_based(args, matcher, num_classes, obj_detector_post):
         'classification_head': classifier_head,
     }
 
-    tracking_kwargs['track_obj_score_threshold'] = 0.4
+    tracking_kwargs['track_obj_score_threshold'] = args.track_obj_score_threshold
     tracking_kwargs['obj_detector_post'] = obj_detector_post
     tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
     tracking_kwargs['disable_propagate_track_query_experiment'] = args.disable_propagate_track_query_experiment
@@ -172,7 +172,7 @@ def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
             else:
                 if hasattr(args, 'sequence_frames') and args.sequence_frames is not None and args.sequence_frames > 1:
                     print(f'Building autoregressive deformable detr model')
-                    tracking_kwargs['track_obj_score_threshold'] = 0.4
+                    tracking_kwargs['track_obj_score_threshold'] = args.track_obj_score_threshold
                     tracking_kwargs['obj_detector_post'] = obj_detector_post
                     tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
                     tracking_kwargs['disable_propagate_track_query_experiment'] = args.disable_propagate_track_query_experiment
