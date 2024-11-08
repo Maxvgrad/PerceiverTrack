@@ -313,8 +313,17 @@ class DeformablePostProcess(PostProcess):
         # boxes = box_ops.box_cxcywh_to_xyxy(out_bbox)
         # boxes = torch.gather(boxes, 1, topk_boxes.unsqueeze(-1).repeat(1,1,4))
         ###
+        print('logits:')
+        print(out_logits)
 
+        print('prob:')
+        print(prob)
         scores, labels = prob.max(-1)
+        print('labels:')
+        print(labels)
+        print('scores:')
+        print(scores)
+
         # scores, labels = prob[..., 0:1].max(-1)
         boxes = box_ops.box_cxcywh_to_xyxy(out_bbox)
 
