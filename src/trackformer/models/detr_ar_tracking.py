@@ -161,12 +161,14 @@ class DETRArTrackingBase(nn.Module):
             # for b in range(logits.shape[0]):  # Iterate over each batch
             # Get the number of elements (queries) for the current batch
             num_elements = logits.shape[0]
-
+            assert logits.shape[0] == boxes.shape[0]
             # Pad if necessary to match max_size
             if num_elements < max_size:
                 # Pad logits and boxes to match max_size
                 pad_size = max_size - num_elements
-                padding_logits = torch.zeros((pad_size, logits.shape[1]), device=logits.device)
+                padding_logits = torch.full((pad_size, logits.shape[1]), -float('inf'), device=logits.device)
+                padding_logits[:,-1] = float('inf') # assign hight score to background class
+
                 padding_boxes = torch.zeros((pad_size, boxes.shape[1]), device=boxes.device)
 
                 # Concatenate original logits/boxes with padding
@@ -307,11 +309,17 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
                 track_query_hs_embed = hs_embeds[i]  # Embeddings
                 track_query_boxes = pred_boxes[i]  # Boxes
 
+                assert track_query_boxes.shape[0] == track_query_hs_embed.shape[0]
                 num_track_queries_used = track_query_hs_embed.shape[0]
                 current_target['custom_numeric_metric_num_track_queries_used'] = torch.tensor(num_track_queries_used, dtype=torch.float32)
+
                 # Pad `track_query_hs_embeds` with zeros to match max_num_queries
-                if track_query_hs_embed.shape[0] < max_num_queries:
-                    padding_size = max_num_queries - track_query_hs_embed.shape[0]
+                padding_size = max_num_queries - num_track_queries_used
+
+                if padding_size > 0:
+                    print(f"Padding size {padding_size}")
+
+                if num_track_queries_used < max_num_queries:
                     padded_hs_embed = torch.cat([track_query_hs_embed,
                                                  torch.zeros((padding_size, track_query_hs_embed.shape[1]),
                                                              dtype=track_query_hs_embed.dtype,
@@ -320,8 +328,7 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
                     padded_hs_embed = track_query_hs_embed
 
                 # Pad `track_query_boxes` with float('nan') to match max_num_queries
-                if track_query_boxes.shape[0] < max_num_queries:
-                    padding_size = max_num_queries - track_query_boxes.shape[0]
+                if num_track_queries_used < max_num_queries:
                     nan_padding = torch.full((padding_size, track_query_boxes.shape[1]), float(0),
                                              dtype=track_query_boxes.dtype, device=track_query_boxes.device)
                     padded_track_query_boxes = torch.cat([track_query_boxes, nan_padding], dim=0)
