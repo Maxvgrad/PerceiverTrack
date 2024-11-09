@@ -227,6 +227,7 @@ class DeformableDETR(DETR):
             src_list = []
             mask_list = []
             pos_list = []
+            features_all = None
 
 
         query_embeds = None
