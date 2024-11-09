@@ -178,7 +178,7 @@ class DeformableTransformer(nn.Module):
         else:
             spatial_shapes = []
             mask_flatten = []
-            valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
+            valid_ratios = []
             memory = None
 
         # prepare input for decoder
