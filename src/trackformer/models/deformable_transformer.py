@@ -133,31 +133,31 @@ class DeformableTransformer(nn.Module):
     def forward(self, srcs, masks, pos_embeds, query_embed=None, targets=None):
         assert self.two_stage or query_embed is not None
 
-        # prepare input for encoder
-        src_flatten = []
-        mask_flatten = []
-        lvl_pos_embed_flatten = []
-        spatial_shapes = []
-        for lvl, (src, mask, pos_embed) in enumerate(zip(srcs, masks, pos_embeds)):
-            bs, c, h, w = src.shape
-            spatial_shape = (h, w)
-            spatial_shapes.append(spatial_shape)
-            src = src.flatten(2).transpose(1, 2)
-            mask = mask.flatten(1)
-            pos_embed = pos_embed.flatten(2).transpose(1, 2)
-            lvl_pos_embed = pos_embed + self.level_embed[lvl].view(1, 1, -1)
-            # lvl_pos_embed = pos_embed + self.level_embed[lvl % self.num_feature_levels].view(1, 1, -1)
-            lvl_pos_embed_flatten.append(lvl_pos_embed)
-            src_flatten.append(src)
-            mask_flatten.append(mask)
-        src_flatten = torch.cat(src_flatten, 1)
-        mask_flatten = torch.cat(mask_flatten, 1)
-        lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)
-        spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
-        valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
+        if len(masks) > 0 and not all(m.all() for m in masks): # check not all mask is ones
+            # prepare input for encoder
+            src_flatten = []
+            mask_flatten = []
+            lvl_pos_embed_flatten = []
+            spatial_shapes = []
+            for lvl, (src, mask, pos_embed) in enumerate(zip(srcs, masks, pos_embeds)):
+                bs, c, h, w = src.shape
+                spatial_shape = (h, w)
+                spatial_shapes.append(spatial_shape)
+                src = src.flatten(2).transpose(1, 2)
+                mask = mask.flatten(1)
+                pos_embed = pos_embed.flatten(2).transpose(1, 2)
+                lvl_pos_embed = pos_embed + self.level_embed[lvl].view(1, 1, -1)
+                # lvl_pos_embed = pos_embed + self.level_embed[lvl % self.num_feature_levels].view(1, 1, -1)
+                lvl_pos_embed_flatten.append(lvl_pos_embed)
+                src_flatten.append(src)
+                mask_flatten.append(mask)
+            src_flatten = torch.cat(src_flatten, 1)
+            mask_flatten = torch.cat(mask_flatten, 1)
+            lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)
+            spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
+            valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # encoder
-        if len(masks) > 0 and not mask_flatten.all(): # check not all mask is ones
             if self.multi_frame_attention_separate_encoder:
                 prev_memory = self.encoder(
                     src_flatten[:, :src_flatten.shape[1] // 2],
@@ -176,6 +176,9 @@ class DeformableTransformer(nn.Module):
                 memory = self.encoder(src_flatten, spatial_shapes, valid_ratios, lvl_pos_embed_flatten, mask_flatten)
 
         else:
+            spatial_shapes = []
+            mask_flatten = []
+            valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
             memory = None
 
         # prepare input for decoder
@@ -423,12 +426,16 @@ class DeformableTransformerDecoder(nn.Module):
         intermediate = []
         intermediate_reference_points = []
         for lid, layer in enumerate(self.layers):
-            if reference_points.shape[-1] == 4:
-                reference_points_input = reference_points[:, :, None] \
-                                         * torch.cat([src_valid_ratios, src_valid_ratios], -1)[:, None]
+            if src is not None:
+                if reference_points.shape[-1] == 4:
+                    reference_points_input = reference_points[:, :, None] \
+                                             * torch.cat([src_valid_ratios, src_valid_ratios], -1)[:, None]
+                else:
+                    assert reference_points.shape[-1] == 2
+                    reference_points_input = reference_points[:, :, None] * src_valid_ratios[:, None]
+
             else:
-                assert reference_points.shape[-1] == 2
-                reference_points_input = reference_points[:, :, None] * src_valid_ratios[:, None]
+                reference_points_input = None
             output = layer(output, query_pos, reference_points_input, src, src_spatial_shapes, src_padding_mask, query_attn_mask)
 
             # hack implementation for iterative bounding box refinement
