@@ -138,87 +138,96 @@ class DeformableDETR(DETR):
         """
         if not isinstance(samples, NestedTensor):
             samples = nested_tensor_from_tensor_list(samples)
-        features, pos = self.backbone(samples)
 
-        features_all = features
-        # pos_all = pos
-        # return_layers = {"layer2": "0", "layer3": "1", "layer4": "2"}
-        features = features[-3:]
-        # pos = pos[-3:]
+        features, masks = samples.decompose()
 
-        if prev_features is None:
-            prev_features = features
-        else:
-            prev_features = prev_features[-3:]
+        if not masks.all(): # check not all mask is ones
+            features, pos = self.backbone(samples)
 
-        # srcs = []
-        # masks = []
-        src_list = []
-        mask_list = []
-        pos_list = []
-        # for l, (feat, prev_feat) in enumerate(zip(features, prev_features)):
+            features_all = features
+            # pos_all = pos
+            # return_layers = {"layer2": "0", "layer3": "1", "layer4": "2"}
+            features = features[-3:]
+            # pos = pos[-3:]
 
-        frame_features = [prev_features, features]
-        if not self.multi_frame_attention:
-            frame_features = [features]
-
-        for frame, frame_feat in enumerate(frame_features):
-            if self.multi_frame_attention and self.multi_frame_encoding:
-                pos_list.extend([p[:, frame] for p in pos[-3:]])
+            if prev_features is None:
+                prev_features = features
             else:
-                pos_list.extend(pos[-3:])
+                prev_features = prev_features[-3:]
 
-            # src, mask = feat.decompose()
+            # srcs = []
+            # masks = []
+            src_list = []
+            mask_list = []
+            pos_list = []
+            # for l, (feat, prev_feat) in enumerate(zip(features, prev_features)):
 
-            # prev_src, _ = prev_feat.decompose()
+            frame_features = [prev_features, features]
+            if not self.multi_frame_attention:
+                frame_features = [features]
 
-            for l, feat in enumerate(frame_feat):
-                src, mask = feat.decompose()
-
-                if self.merge_frame_features:
-                    prev_src, _ = prev_features[l].decompose()
-                    src_list.append(self.merge_features[l](torch.cat([self.input_proj[l](src), self.input_proj[l](prev_src)], dim=1)))
+            for frame, frame_feat in enumerate(frame_features):
+                if self.multi_frame_attention and self.multi_frame_encoding:
+                    pos_list.extend([p[:, frame] for p in pos[-3:]])
                 else:
-                    src_list.append(self.input_proj[l](src))
+                    pos_list.extend(pos[-3:])
 
-                mask_list.append(mask)
+                # src, mask = feat.decompose()
 
-            # if hasattr(self, 'merge_features'):
-            #     srcs.append(self.merge_features[l](torch.cat([self.input_proj[l](src), self.input_proj[l](prev_src)], dim=1)))
-            # else:
-            #     srcs.append(self.input_proj[l](src))
+                # prev_src, _ = prev_feat.decompose()
 
-            # masks.append(mask)
-                assert mask is not None
+                for l, feat in enumerate(frame_feat):
+                    src, mask = feat.decompose()
 
-            if self.num_feature_levels > len(frame_feat):
-                _len_srcs = len(frame_feat)
-                for l in range(_len_srcs, self.num_feature_levels):
-                    if l == _len_srcs:
-                        # src = self.input_proj[l](frame_feat[-1].tensors)
-                        # if hasattr(self, 'merge_features'):
-                        #     src = self.merge_features[l](torch.cat([self.input_proj[l](features[-1].tensors), self.input_proj[l](prev_features[-1].tensors)], dim=1))
-                        # else:
-                        #     src = self.input_proj[l](features[-1].tensors)
-
-                        if self.merge_frame_features:
-                            src = self.merge_features[l](torch.cat([self.input_proj[l](frame_feat[-1].tensors), self.input_proj[l](prev_features[-1].tensors)], dim=1))
-                        else:
-                            src = self.input_proj[l](frame_feat[-1].tensors)
+                    if self.merge_frame_features:
+                        prev_src, _ = prev_features[l].decompose()
+                        src_list.append(self.merge_features[l](torch.cat([self.input_proj[l](src), self.input_proj[l](prev_src)], dim=1)))
                     else:
-                        src = self.input_proj[l](src_list[-1])
-                        # src = self.input_proj[l](srcs[-1])
-                    # m = samples.mask
-                    _, m = frame_feat[0].decompose()
-                    mask = F.interpolate(m[None].float(), size=src.shape[-2:]).to(torch.bool)[0]
+                        src_list.append(self.input_proj[l](src))
 
-                    pos_l = self.backbone[1](NestedTensor(src, mask)).to(src.dtype)
-                    src_list.append(src)
                     mask_list.append(mask)
-                    if self.multi_frame_attention and self.multi_frame_encoding:
-                        pos_list.append(pos_l[:, frame])
-                    else:
-                        pos_list.append(pos_l)
+
+                # if hasattr(self, 'merge_features'):
+                #     srcs.append(self.merge_features[l](torch.cat([self.input_proj[l](src), self.input_proj[l](prev_src)], dim=1)))
+                # else:
+                #     srcs.append(self.input_proj[l](src))
+
+                # masks.append(mask)
+                    assert mask is not None
+
+                if self.num_feature_levels > len(frame_feat):
+                    _len_srcs = len(frame_feat)
+                    for l in range(_len_srcs, self.num_feature_levels):
+                        if l == _len_srcs:
+                            # src = self.input_proj[l](frame_feat[-1].tensors)
+                            # if hasattr(self, 'merge_features'):
+                            #     src = self.merge_features[l](torch.cat([self.input_proj[l](features[-1].tensors), self.input_proj[l](prev_features[-1].tensors)], dim=1))
+                            # else:
+                            #     src = self.input_proj[l](features[-1].tensors)
+
+                            if self.merge_frame_features:
+                                src = self.merge_features[l](torch.cat([self.input_proj[l](frame_feat[-1].tensors), self.input_proj[l](prev_features[-1].tensors)], dim=1))
+                            else:
+                                src = self.input_proj[l](frame_feat[-1].tensors)
+                        else:
+                            src = self.input_proj[l](src_list[-1])
+                            # src = self.input_proj[l](srcs[-1])
+                        # m = samples.mask
+                        _, m = frame_feat[0].decompose()
+                        mask = F.interpolate(m[None].float(), size=src.shape[-2:]).to(torch.bool)[0]
+
+                        pos_l = self.backbone[1](NestedTensor(src, mask)).to(src.dtype)
+                        src_list.append(src)
+                        mask_list.append(mask)
+                        if self.multi_frame_attention and self.multi_frame_encoding:
+                            pos_list.append(pos_l[:, frame])
+                        else:
+                            pos_list.append(pos_l)
+        else:
+            src_list = []
+            mask_list = []
+            pos_list = []
+
 
         query_embeds = None
         if not self.two_stage:

@@ -157,7 +157,7 @@ class DeformableTransformer(nn.Module):
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # encoder
-        if not mask_flatten.all(): # check not all mask is ones
+        if len(masks) > 0 and not mask_flatten.all(): # check not all mask is ones
             if self.multi_frame_attention_separate_encoder:
                 prev_memory = self.encoder(
                     src_flatten[:, :src_flatten.shape[1] // 2],
@@ -179,8 +179,14 @@ class DeformableTransformer(nn.Module):
             memory = None
 
         # prepare input for decoder
+        bs = 1 # Assume batch size is 1
+        c = query_embed.shape[1] // 2
 
-        bs, c, *_ = srcs[0].shape
+        if len(srcs) > 0:
+            bs_s, c_s, *_ = srcs[0].shape
+            assert bs == bs_s
+            assert c == c_s
+
         if memory is not None:
             # sense check
             bs_m, _, c_m = memory.shape

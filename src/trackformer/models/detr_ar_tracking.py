@@ -316,9 +316,6 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
                 # Pad `track_query_hs_embeds` with zeros to match max_num_queries
                 padding_size = max_num_queries - num_track_queries_used
 
-                if padding_size > 0:
-                    print(f"Padding size {padding_size}")
-
                 if num_track_queries_used < max_num_queries:
                     padded_hs_embed = torch.cat([track_query_hs_embed,
                                                  torch.zeros((padding_size, track_query_hs_embed.shape[1]),
