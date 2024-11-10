@@ -267,7 +267,7 @@ class DETRTrackingBase(nn.Module):
                         # Nuimages case when GT is not provided for previous frame
                         for i, target in enumerate(targets):
 
-                            if self.focal_loss:
+                            if True: # TODO
                                 out_prob = prev_out["pred_logits"][i].sigmoid()
                             else:
                                 out_prob = prev_out["pred_logits"][i].softmax(-1)
