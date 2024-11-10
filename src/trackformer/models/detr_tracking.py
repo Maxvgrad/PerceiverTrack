@@ -259,9 +259,37 @@ class DETRTrackingBase(nn.Module):
                     # prev_out = {k: v.detach() for k, v in prev_out.items() if torch.is_tensor(v)}
                     prev_outputs_without_aux = {
                         k: v for k, v in prev_out.items() if 'aux_outputs' not in k}
-                    prev_indices = self._matcher(prev_outputs_without_aux, prev_targets)
 
-                    self.add_track_queries_to_targets(targets, prev_indices, prev_out)
+                    if 'labels' in targets[0]:
+                        prev_indices = self._matcher(prev_outputs_without_aux, prev_targets)
+                        self.add_track_queries_to_targets(targets, prev_indices, prev_out)
+                    else:
+                        # Nuimages case when GT is not provided for previous frame
+                        for i, target in enumerate(targets):
+
+                            if self.focal_loss:
+                                out_prob = prev_out["pred_logits"][i].sigmoid()
+                            else:
+                                out_prob = prev_out["pred_logits"][i].softmax(-1)
+
+                            scores, labels = out_prob.max(-1)
+
+                            hs_embed = prev_out['hs_embed'][i]
+                            pred_boxes = prev_out['pred_boxes'][i]
+                            person_to_keep = labels == 0
+
+                            hs_embed = hs_embed[person_to_keep]
+                            scores = scores[person_to_keep]
+                            pred_boxes = pred_boxes[person_to_keep]
+
+                            if scores.shape[0] > 100:
+                                top100_idx = scores.topk(100).indices
+                                hs_embed = hs_embed[top100_idx]
+                                scores = scores[top100_idx]
+                                pred_boxes = pred_boxes[top100_idx]
+
+                            target['track_query_hs_embeds'] = hs_embed
+                            target['track_query_boxes'] = pred_boxes
             else:
                 # if not training we do not add track queries and evaluate detection performance only.
                 # tracking performance is evaluated by the actual tracking evaluation.
