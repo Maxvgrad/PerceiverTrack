@@ -134,7 +134,6 @@ class DeformableTransformer(nn.Module):
         assert self.two_stage or query_embed is not None
 
         if len(masks) > 0 and not all(m.all() for m in masks): # check not all mask is ones
-            print('encoder')
             # prepare input for encoder
             src_flatten = []
             mask_flatten = []
@@ -177,7 +176,6 @@ class DeformableTransformer(nn.Module):
                 memory = self.encoder(src_flatten, spatial_shapes, valid_ratios, lvl_pos_embed_flatten, mask_flatten)
 
         else:
-            print('encoder bypass')
             spatial_shapes = []
             mask_flatten = []
             valid_ratios = []
@@ -186,7 +184,7 @@ class DeformableTransformer(nn.Module):
         # prepare input for decoder
         bs = 1 # Assume batch size is 1
         c = query_embed.shape[1] // 2
-        print(f'c: {c}')
+
         if len(srcs) > 0:
             bs_s, c_s, *_ = srcs[0].shape
             assert bs == bs_s, f"{bs} != {bs_s}"
@@ -399,7 +397,6 @@ class DeformableTransformerDecoderLayer(nn.Module):
                                    src, src_spatial_shapes, src_padding_mask, query_attn_mask)
 
         else:
-            print('cross_attention bypass')
             # src_padding_mask has all ones (fully masked) so bypass cross attention
             tgt2 = torch.zeros_like(tgt).to(tgt.device)
 
@@ -436,9 +433,8 @@ class DeformableTransformerDecoder(nn.Module):
                 else:
                     assert reference_points.shape[-1] == 2
                     reference_points_input = reference_points[:, :, None] * src_valid_ratios[:, None]
-                print(f'decoder reference_points_input shape {reference_points.shape}')
+
             else:
-                print('decoder reference_points_input None')
                 reference_points_input = None
             output = layer(output, query_pos, reference_points_input, src, src_spatial_shapes, src_padding_mask, query_attn_mask)
 

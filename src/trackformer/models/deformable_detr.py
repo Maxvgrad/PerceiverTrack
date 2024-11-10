@@ -142,7 +142,6 @@ class DeformableDETR(DETR):
         features, masks = samples.decompose()
 
         if not masks.all(): # check not all mask is ones
-            print("backbone")
             features, pos = self.backbone(samples)
 
             features_all = features
@@ -225,7 +224,6 @@ class DeformableDETR(DETR):
                         else:
                             pos_list.append(pos_l)
         else:
-            print("bypass")
             src_list = []
             mask_list = []
             pos_list = []
