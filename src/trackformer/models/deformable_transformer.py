@@ -189,14 +189,14 @@ class DeformableTransformer(nn.Module):
         print(f'c: {c}')
         if len(srcs) > 0:
             bs_s, c_s, *_ = srcs[0].shape
-            assert bs == bs_s
-            assert c == c_s
+            assert bs == bs_s, f"{bs} != {bs_s}"
+            assert c == c_s, f"{c} != {c_s}"
 
         if memory is not None:
             # sense check
             bs_m, _, c_m = memory.shape
-            assert bs == bs_m
-            assert c == c_m
+            assert bs == bs_m, f"{bs} != {bs_m}"
+            assert c == c_m, f"{c} != {c_m}"
 
         query_attn_mask = None
         if self.two_stage:
