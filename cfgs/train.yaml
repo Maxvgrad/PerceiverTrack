@@ -129,7 +129,7 @@ frame_dropout_prob: 0.0
 # Miscellaneous
 # path where to save, empty for no saving
 output_dir: ''
-result_file: 'result.csv'
+result_file: null
 # device to use for training / testing
 device: cuda
 seed: 42
@@ -161,3 +161,5 @@ vis_and_log_interval: 50
 no_vis: false
 
 decrement_person_label_after_loading_into_memory: false
+detection_nms_thresh: 0.9
+track_obj_score_threshold: -1

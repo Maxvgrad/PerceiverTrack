@@ -101,7 +101,13 @@ class HungarianMatcher(nn.Module):
         cost_matrix = self.cost_bbox * cost_bbox \
             + self.cost_class * cost_class \
             + self.cost_giou * cost_giou
-        cost_matrix = cost_matrix.view(batch_size, num_queries, -1).cpu()
+
+        if cost_matrix.numel() == 0:
+            print("Warning: cost_matrix is empty, skipping reshaping and returning empty indices.")
+            return [(torch.tensor([], dtype=torch.int64), torch.tensor([], dtype=torch.int64)) for _ in
+                    range(batch_size)]
+        else:
+            cost_matrix = cost_matrix.view(batch_size, num_queries, -1).cpu()
 
         sizes = [len(v["boxes"]) for v in targets]
 

@@ -14,9 +14,10 @@ class DETRArTrackingBase(nn.Module):
 
     def __init__(self,
                  obj_detector_post,
-                 track_obj_score_threshold: float = 0.4,
+                 track_obj_score_threshold: float = -1.0,
                  max_num_of_frames_lookback: int = 0,
                  disable_propagate_track_query_experiment: bool = False,
+                 detection_nms_thresh: float = 0.5,
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
@@ -24,7 +25,7 @@ class DETRArTrackingBase(nn.Module):
         self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
         self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
-        self.detection_nms_thresh = 0.9
+        self.detection_nms_thresh = detection_nms_thresh
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
         src, mask = samples.decompose()
@@ -160,12 +161,14 @@ class DETRArTrackingBase(nn.Module):
             # for b in range(logits.shape[0]):  # Iterate over each batch
             # Get the number of elements (queries) for the current batch
             num_elements = logits.shape[0]
-
+            assert logits.shape[0] == boxes.shape[0]
             # Pad if necessary to match max_size
             if num_elements < max_size:
                 # Pad logits and boxes to match max_size
                 pad_size = max_size - num_elements
-                padding_logits = torch.zeros((pad_size, logits.shape[1]), device=logits.device)
+                padding_logits = torch.full((pad_size, logits.shape[1]), -float('inf'), device=logits.device)
+                padding_logits[:,-1] = float('inf') # assign hight score to background class
+
                 padding_boxes = torch.zeros((pad_size, boxes.shape[1]), device=boxes.device)
 
                 # Concatenate original logits/boxes with padding
@@ -226,16 +229,16 @@ class DETRArTrackingBase(nn.Module):
             previous_track_boxes = output['pred_boxes'][i][:number_previous_track_queries][previous_track_keep]
             previous_track_pred_logits = output['pred_logits'][i][:number_previous_track_queries][previous_track_keep]
             previous_hs_embed = output['hs_embed'][i][:number_previous_track_queries][previous_track_keep]
-            previous_track_scores = torch.zeros_like(previous_track_scores[previous_track_keep])
-            previous_track_scores.fill_(float('inf'))
-            assert torch.all(previous_track_scores == float('inf'))
+
+            previous_track_scores = previous_track_scores[previous_track_keep]
+            previous_track_scores_inf = torch.full_like(previous_track_scores, float('inf'))
+            assert torch.all(previous_track_scores_inf == float('inf'))
+
             previous_boxes = previous_boxes[previous_track_keep]
 
             new_track_scores = post_process_result['scores'][-self.num_queries:]
             new_boxes = post_process_result['boxes'][-self.num_queries:]
             new_track_labels = post_process_result['labels'][-self.num_queries:]
-
-            number_new_tracks = new_track_scores.shape[0]
 
             new_track_keep = torch.logical_and(
                 new_track_scores > self._track_obj_score_threshold,
@@ -255,11 +258,16 @@ class DETRArTrackingBase(nn.Module):
             logits = torch.cat([previous_track_pred_logits, new_track_pred_logits])
             hs_embeds = torch.cat([previous_hs_embed, new_hs_embed])
 
-            track_scores = torch.cat([previous_track_scores, new_track_scores])
-
+            track_scores = torch.cat([previous_track_scores_inf, new_track_scores])
             keep = nms(track_boxes, track_scores, self.detection_nms_thresh)
 
             after_nms_count = keep.shape[0]
+
+            if after_nms_count > 100:
+                # Sort and keep indices of the top 100 scores
+                real_track_scores = torch.cat([previous_track_scores, new_track_scores])
+                top100_idx = real_track_scores[keep].topk(100).indices
+                keep = keep[top100_idx]
 
             filtered_output['nms_deltas'].append(
                 torch.tensor((previous_keep_count + new_keep_count) - after_nms_count, dtype=torch.float32)
@@ -301,11 +309,14 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
                 track_query_hs_embed = hs_embeds[i]  # Embeddings
                 track_query_boxes = pred_boxes[i]  # Boxes
 
+                assert track_query_boxes.shape[0] == track_query_hs_embed.shape[0]
                 num_track_queries_used = track_query_hs_embed.shape[0]
                 current_target['custom_numeric_metric_num_track_queries_used'] = torch.tensor(num_track_queries_used, dtype=torch.float32)
+
                 # Pad `track_query_hs_embeds` with zeros to match max_num_queries
-                if track_query_hs_embed.shape[0] < max_num_queries:
-                    padding_size = max_num_queries - track_query_hs_embed.shape[0]
+                padding_size = max_num_queries - num_track_queries_used
+
+                if num_track_queries_used < max_num_queries:
                     padded_hs_embed = torch.cat([track_query_hs_embed,
                                                  torch.zeros((padding_size, track_query_hs_embed.shape[1]),
                                                              dtype=track_query_hs_embed.dtype,
@@ -314,8 +325,7 @@ class DeformableDETRArTracking(DETRArTrackingBase, DeformableDETR):
                     padded_hs_embed = track_query_hs_embed
 
                 # Pad `track_query_boxes` with float('nan') to match max_num_queries
-                if track_query_boxes.shape[0] < max_num_queries:
-                    padding_size = max_num_queries - track_query_boxes.shape[0]
+                if num_track_queries_used < max_num_queries:
                     nan_padding = torch.full((padding_size, track_query_boxes.shape[1]), float(0),
                                              dtype=track_query_boxes.dtype, device=track_query_boxes.device)
                     padded_track_query_boxes = torch.cat([track_query_boxes, nan_padding], dim=0)

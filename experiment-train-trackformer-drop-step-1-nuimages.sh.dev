@@ -1,19 +1,19 @@
 #!/bin/bash -l
 
 #SBATCH -A bolt
-#SBATCH --job-name="bolt-internship-train-trackformer-private-step-1-crowdhuman"
+#SBATCH --job-name="bolt-internship-train-trackformer-drop-nuimages"
 #SBATCH --time=24:00:00
 #SBATCH --partition=gpu
 #SBATCH --output=not_tracked_dir/slurm/%j_slurm_%x.out
 
 # Resource allocation
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=4
 #SBATCH --mem=64G
 
 # Node configurations (commented out)
 ## falcone configurations
-#SBATCH --gres=gpu:tesla:2
+#SBATCH --gres=gpu:tesla:4
 #SBATCH --cpus-per-task=4
 
 ## Pegasus configuration
@@ -27,14 +27,28 @@
 #----------------------------------------
 # Parse Arguments
 #----------------------------------------
-resume_flag=false
-while getopts "r" opt; do
+wandb_id=None
+resume_optim=False
+resume=""  # No resume
+timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+output_dir="not_tracked_dir/output_${model_name}_${timestamp}"
+
+while getopts "r:wid:ro:o" opt; do
   case ${opt} in
+    o )
+      output_dir=$OPTARG
+      ;;
     r )
-      resume_flag=true
+      resume=$OPTARG
+      ;;
+    ro )
+      resume_optim=True
+      ;;
+    wid )
+      wandb_id=$OPTARG
       ;;
     \? )
-      echo "Usage: cmd [-r] to enable resume"
+      echo "Usage: cmd -o output dir [-r] checkpoint [-ro] to enable optim [-wid] wandb id to continue logging"
       exit 1
       ;;
   esac
@@ -45,15 +59,6 @@ done
 #----------------------------------------
 module load miniconda3
 conda activate perceiver_track
-
-#----------------------------------------
-# Directory Setup
-#----------------------------------------
-# Create output directory with timestamp
-timestamp=$(date +%Y-%m-%d_%H-%M-%S)
-output_dir="not_tracked_dir/output_${model_name}_${timestamp}"
-# For debugging/testing, use fixed output directory
-output_dir="models/crowdhuman_deformable_multi_frame_reproduce"
 
 #----------------------------------------
 # Distributed Training Setup
@@ -76,36 +81,29 @@ echo "MASTER_ADDR=$MASTER_ADDR"
 echo "WORLD_SIZE=$WORLD_SIZE"
 echo "SLURM_PROCID=$SLURM_PROCID"
 echo "RANK=$RANK"
-echo "output_dir=$output_dir"
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 
-#----------------------------------------
-# Training Command
-#----------------------------------------
-
-# Set parameters based on resume flag
-if [ "$resume_flag" = true ]; then
-    checkpoint=$output_dir/checkpoint.pth
-    wandb_id="djiokxzk"
-    resume_optim=true
-    resume=$checkpoint
-    echo "Resuming training from checkpoint: $checkpoint"
-else
-    wandb_id=None  # Set this to an empty string or a default value if necessary
-    resume_optim=false
-    resume=""  # No resume
-    echo "Starting new training run."
-fi
+echo "output_dir=$output_dir"
+echo "resume=$resume"
+echo "resume_optim=$resume_optim"
+echo "wandb_id=$wandb_id"
 
 # Launch training
 srun python src/train.py with \
-    crowdhuman \
+    nuimages \
     deformable \
     multi_frame \
     tracking \
+    train_split=cam-front_nuimages_v1.0-train \
+    val_split=mot17_train_cross_val_frame_0_5_to_1_0_coco \
+    batch_size=1 \
     world_size=$WORLD_SIZE \
     output_dir=$output_dir \
-    wandb_project='trackformer-train-from-scratch' \
+    wandb_project='trackformer-drop-train' \
+    track_query_false_negative_prob=0 \
+    track_query_false_positive_prob=0 \
+    frame_dropout_prob=0.1 \
+    tracking_eval=False \
     wandb_id="$wandb_id" \
     resume_optim="$resume_optim" \
     resume="$resume"

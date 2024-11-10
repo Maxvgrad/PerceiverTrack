@@ -64,8 +64,9 @@ def build_model(args):
             is_thing_map = {i: i <= 90 for i in range(201)}
             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
 
-    if args.eval_only:
-        postprocessors["result_saver"] = PostProcessResultSave()
+    if args.eval_only and args.result_file:
+        print('Add result saver post processor.')
+        postprocessors["result_saver"] = PostProcessResultSave(bbox_postprocessor=postprocessors['bbox'])
 
     if hasattr(args, 'model') and args.model == 'perceiver':
         model = build_model_perceiver_based(args, matcher, num_classes, postprocessors)
@@ -126,7 +127,7 @@ def build_model_perceiver_based(args, matcher, num_classes, obj_detector_post):
         'classification_head': classifier_head,
     }
 
-    tracking_kwargs['track_obj_score_threshold'] = 0.4
+    tracking_kwargs['track_obj_score_threshold'] = args.track_obj_score_threshold
     tracking_kwargs['obj_detector_post'] = obj_detector_post
     tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
     tracking_kwargs['disable_propagate_track_query_experiment'] = args.disable_propagate_track_query_experiment
@@ -171,10 +172,11 @@ def build_model_detr_based(args, matcher, num_classes, obj_detector_post):
             else:
                 if hasattr(args, 'sequence_frames') and args.sequence_frames is not None and args.sequence_frames > 1:
                     print(f'Building autoregressive deformable detr model')
-                    tracking_kwargs['track_obj_score_threshold'] = 0.4
+                    tracking_kwargs['track_obj_score_threshold'] = args.track_obj_score_threshold
                     tracking_kwargs['obj_detector_post'] = obj_detector_post
                     tracking_kwargs['max_num_of_frames_lookback'] = args.max_num_of_frames_lookback
                     tracking_kwargs['disable_propagate_track_query_experiment'] = args.disable_propagate_track_query_experiment
+                    tracking_kwargs['detection_nms_thresh'] = args.detection_nms_thresh
 
                     model = DeformableDETRArTracking(tracking_kwargs, detr_kwargs)
                 else:
