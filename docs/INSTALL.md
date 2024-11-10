@@ -84,6 +84,7 @@
          --version v1.0-mini  v1.0-test  v1.0-train  v1.0-val \
          --out-dir ./data/nuimages/annotations/ \
          --cameras CAM_FRONT \
+         --extra-tag cam-front_nuimages \
          --categories pedestrian
        ```
 

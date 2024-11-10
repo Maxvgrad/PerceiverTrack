@@ -3,11 +3,9 @@ dataset: nuimages
 train_split: train
 val_split: val
 
-resume: null
-
 # Training
-epochs: 50
-lr_drop: 10
+epochs: 80
+lr_drop: 50
 
 # Evaluation
 max_num_of_frames_lookback: 6

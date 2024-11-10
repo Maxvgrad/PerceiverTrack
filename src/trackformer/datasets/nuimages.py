@@ -19,13 +19,16 @@ class NuImagesDetection(torchvision.datasets.CocoDetection):
             transforms,
             norm_transforms,
             debug=False,
+            sequence_frames: int = 7,
+            frame_dropout_prob: float = 0.0,
     ):
         super(NuImagesDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
         self._norm_transforms = norm_transforms
         self.prepare = ConvertCocoPolysToMask()
         self._debug = debug
-
+        self._sequence_frames = sequence_frames
+        self._frame_dropout_prob = frame_dropout_prob
         self.img_to_past = {img['id']: [] for img in self.coco.imgs.values()}
 
         if 'past_images' in self.coco.dataset:
@@ -88,6 +91,20 @@ class NuImagesDetection(torchvision.datasets.CocoDetection):
             'torch': torch.random.get_rng_state()}
         imgs, targets = self._getitem_by_id(idx, random_state)
 
+        if self._sequence_frames == 1:
+            img = imgs[-1]
+            target = targets[-1]
+
+            prev_frame_id = random.randint(0, 7) # 7 is included
+
+            prev_img, prev_target = imgs[prev_frame_id], targets[prev_frame_id]
+            target[f'prev_image'] = prev_img
+            target[f'prev_target'] = prev_target
+
+            keep_frame = 0 if random.random() < self._frame_dropout_prob else 1
+            target['keep_frame'] = torch.tensor([keep_frame], dtype=torch.int64)
+            return img, target
+
         return imgs, targets
 
 
@@ -98,7 +115,7 @@ def build(image_set, args):
     split = getattr(args, f"{image_set}_split")
 
     img_folder = root
-    ann_file = root / f'annotations/nuimages_v1.0-{split}.json'
+    ann_file = root / f'annotations/{split}.json'
 
     transforms, norm_transforms = make_coco_transforms(image_set)
 
@@ -107,7 +124,9 @@ def build(image_set, args):
         ann_file,
         transforms,
         norm_transforms,
-        args.debug
+        args.debug,
+        sequence_frames=args.sequence_frames,
+        frame_dropout_prob=args.frame_dropout_prob
     )
 
     return dataset
