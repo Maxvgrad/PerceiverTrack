@@ -254,7 +254,7 @@ class DETRTrackingBase(nn.Module):
                             prev_targets,
                             prev_prev_features)
                     else:
-                        print(f"prev target keep_frame: {[t['prev_target']['keep_frame'] if 'keep_frame' in t['prev_target'] else -1 for t in targets]}")
+                        print(f"prev image: {[t['prev_image']['keep_frame'] if 'keep_frame' in t['prev_image'] else -1 for t in targets]}")
                         prev_out, _, prev_features, _, _ = super().forward([t['prev_image'] for t in targets])
 
                     # prev_out = {k: v.detach() for k, v in prev_out.items() if torch.is_tensor(v)}
