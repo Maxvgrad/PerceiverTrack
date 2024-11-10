@@ -260,7 +260,7 @@ class DETRTrackingBase(nn.Module):
                     prev_outputs_without_aux = {
                         k: v for k, v in prev_out.items() if 'aux_outputs' not in k}
 
-                    if 'labels' in targets[0]:
+                    if 'labels' in prev_targets[0]:
                         prev_indices = self._matcher(prev_outputs_without_aux, prev_targets)
                         self.add_track_queries_to_targets(targets, prev_indices, prev_out)
                     else:
