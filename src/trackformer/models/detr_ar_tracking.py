@@ -263,11 +263,11 @@ class DETRArTrackingBase(nn.Module):
 
             after_nms_count = keep.shape[0]
 
-            if after_nms_count > 100:
-                # Sort and keep indices of the top 100 scores
-                real_track_scores = torch.cat([previous_track_scores, new_track_scores])
-                top100_idx = real_track_scores[keep].topk(100).indices
-                keep = keep[top100_idx]
+            # if after_nms_count > 100:
+            #     # Sort and keep indices of the top 100 scores
+            #     real_track_scores = torch.cat([previous_track_scores, new_track_scores])
+            #     top100_idx = real_track_scores[keep].topk(100).indices
+            #     keep = keep[top100_idx]
 
             filtered_output['nms_deltas'].append(
                 torch.tensor((previous_keep_count + new_keep_count) - after_nms_count, dtype=torch.float32)
