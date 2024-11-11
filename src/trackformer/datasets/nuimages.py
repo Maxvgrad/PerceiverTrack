@@ -96,7 +96,7 @@ class NuImagesDetection(torchvision.datasets.CocoDetection):
             img = imgs[-1]
             target = targets[-1]
 
-            prev_frame_id = random.randint(0, 6) # upper bound in included
+            prev_frame_id = random.randint(0, 5) # upper bound in included
 
             prev_img, prev_target = imgs[prev_frame_id], targets[prev_frame_id]
 
