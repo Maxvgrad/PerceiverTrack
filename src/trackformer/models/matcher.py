@@ -103,7 +103,6 @@ class HungarianMatcher(nn.Module):
             + self.cost_giou * cost_giou
 
         if cost_matrix.numel() == 0:
-            print("Warning: cost_matrix is empty, skipping reshaping and returning empty indices.")
             return [(torch.tensor([], dtype=torch.int64), torch.tensor([], dtype=torch.int64)) for _ in
                     range(batch_size)]
         else:
