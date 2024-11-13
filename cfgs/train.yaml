@@ -160,6 +160,7 @@ vis_port: 8090
 vis_and_log_interval: 50
 no_vis: false
 
-decrement_person_label_after_loading_into_memory: false
+train_decrement_person_label_after_loading_into_memory: false
+val_decrement_person_label_after_loading_into_memory: false
 detection_nms_thresh: 0.9
 track_obj_score_threshold: -1

@@ -19,9 +19,11 @@ def build_crowdhuman(image_set, args):
     if image_set == 'train':
         prev_frame_rnd_augs = args.coco_and_crowdhuman_prev_frame_rnd_augs
         frame_dropout_prob = args.frame_dropout_prob
+        is_deformable_detr_and_mot17 = args.train_decrement_person_label_after_loading_into_memory
     elif image_set == 'val':
         prev_frame_rnd_augs = 0.0
         frame_dropout_prob = 0.0
+        is_deformable_detr_and_mot17 = args.val_decrement_person_label_after_loading_into_memory
 
     transforms, norm_transforms = make_coco_transforms(
         image_set, args.img_transform, args.overflow_boxes)
@@ -30,7 +32,7 @@ def build_crowdhuman(image_set, args):
         return_masks=args.masks,
         prev_frame=args.tracking,
         prev_frame_rnd_augs=prev_frame_rnd_augs,
-        is_deformable_detr_and_mot17=args.decrement_person_label_after_loading_into_memory,
+        is_deformable_detr_and_mot17=is_deformable_detr_and_mot17,
         frame_dropout_prob=frame_dropout_prob,
     )
 

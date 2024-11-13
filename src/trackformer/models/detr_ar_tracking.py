@@ -15,14 +15,12 @@ class DETRArTrackingBase(nn.Module):
     def __init__(self,
                  obj_detector_post,
                  track_obj_score_threshold: float = -1.0,
-                 max_num_of_frames_lookback: int = 0,
                  disable_propagate_track_query_experiment: bool = False,
                  detection_nms_thresh: float = 0.5,
                  **kwargs
                  ):
         self._obj_detector_post = obj_detector_post
         self._track_obj_score_threshold = track_obj_score_threshold
-        self._max_num_of_frames_lookback = max_num_of_frames_lookback
         self._debug = False
         self._disable_propagate_track_query_experiment = disable_propagate_track_query_experiment
         self.detection_nms_thresh = detection_nms_thresh
