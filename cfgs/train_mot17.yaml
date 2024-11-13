@@ -12,8 +12,5 @@ sequence_frames: 17
 epochs: 50
 lr_drop: 10
 
-# Evaluation
-max_num_of_frames_lookback: 4
-
 train_decrement_person_label_after_loading_into_memory: true
 val_decrement_person_label_after_loading_into_memory: true

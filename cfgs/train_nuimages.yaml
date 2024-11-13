@@ -1,13 +1,13 @@
 dataset: nuimages
 
-train_split: train
-val_split: val
+train_split: cam-all_nuimages_v1.0-train
+val_split: mot17_train_cross_val_frame_0_5_to_1_0_coco
 
 # Training
 epochs: 80
 lr_drop: 50
 
-# Evaluation
-max_num_of_frames_lookback: 6
-
 sequence_frames: 7
+
+train_decrement_person_label_after_loading_into_memory: false
+val_decrement_person_label_after_loading_into_memory: true
