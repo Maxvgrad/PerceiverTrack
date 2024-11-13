@@ -134,11 +134,13 @@ def build_mot(image_set, args):
         prev_frame_rnd_augs = args.track_prev_frame_rnd_augs
         prev_frame_range=args.track_prev_frame_range
         frame_dropout_prob = args.frame_dropout_prob
+        is_deformable_detr_and_mot17 = args.train_decrement_person_label_after_loading_into_memory
     elif image_set == 'val':
         root = Path(args.mot_path_val)
         prev_frame_rnd_augs = 0.0
         prev_frame_range = 1
         frame_dropout_prob = 0.0
+        is_deformable_detr_and_mot17 = args.val_decrement_person_label_after_loading_into_memory
     else:
         ValueError(f'unknown {image_set}')
 
@@ -163,7 +165,7 @@ def build_mot(image_set, args):
         prev_prev_frame=args.track_prev_prev_frame,
         sequence_frames=args.sequence_frames,
         frame_dropout_prob=frame_dropout_prob,
-        is_deformable_detr_and_mot17=args.decrement_person_label_after_loading_into_memory,
+        is_deformable_detr_and_mot17=is_deformable_detr_and_mot17,
     )
 
     return dataset

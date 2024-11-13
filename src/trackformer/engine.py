@@ -190,13 +190,13 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
     base_ds = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = tuple(k for k in ('bbox', 'segm') if k in postprocessors.keys())
-    coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=args.decrement_person_label_after_loading_into_memory)
+    coco_evaluator = CocoEvaluator(base_ds, iou_types, is_deformable_detr_and_mot17=args.val_decrement_person_label_after_loading_into_memory)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
     result_saver = None
     if 'result_saver' in postprocessors.keys():
         result_saver = ResultSaver(file_name=os.path.join(output_dir, args.result_file),
-                                   increment_class_label=args.decrement_person_label_after_loading_into_memory)
+                                   increment_class_label=args.val_decrement_person_label_after_loading_into_memory)
 
     panoptic_evaluator = None
     if 'panoptic' in postprocessors.keys():
