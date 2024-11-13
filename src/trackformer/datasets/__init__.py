@@ -47,7 +47,12 @@ def build_dataset(split: str, args: Namespace) -> Dataset:
         dataset = build_coco_panoptic(split, args)
     elif args.dataset == 'nuimages':
         from .nuimages import build as build_nuimages
-        dataset = build_nuimages(split, args)
+        if split == 'train':
+            dataset = build_nuimages(split, args)
+        elif split == 'val':
+            dataset = build_mot(split, args)
+        else:
+            raise ValueError(f'dataset {args.dataset} split {split} not supported')
     else:
         raise ValueError(f'dataset {args.dataset} not supported')
 

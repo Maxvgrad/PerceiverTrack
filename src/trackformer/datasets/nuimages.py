@@ -1,3 +1,4 @@
+import copy
 import os
 import random
 from pathlib import Path
@@ -95,11 +96,12 @@ class NuImagesDetection(torchvision.datasets.CocoDetection):
             img = imgs[-1]
             target = targets[-1]
 
-            prev_frame_id = random.randint(0, 7) # 7 is included
+            prev_frame_id = random.randint(0, 5) # upper bound in included
 
             prev_img, prev_target = imgs[prev_frame_id], targets[prev_frame_id]
+
             target[f'prev_image'] = prev_img
-            target[f'prev_target'] = prev_target
+            target[f'prev_target'] = copy.deepcopy(prev_target) # make copy in case the same frame is chosen as previous one
 
             keep_frame = 0 if random.random() < self._frame_dropout_prob else 1
             target['keep_frame'] = torch.tensor([keep_frame], dtype=torch.int64)
